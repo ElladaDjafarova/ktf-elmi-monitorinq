@@ -591,9 +591,12 @@ const fmtD = d => d.split('-').reverse().join('.');
 
 // məqalənin dərc tarixi: tam tarix, yoxdursa yalnız il
 function inRange(a, from, to){
-  if(a.date && a.date.length>=10) return (!from || a.date>=from) && a.date<=to;
+  // son tarix bugün (və ya sonra) olanda yuxarı hədd yoxdur: jurnalın gələcək tarixli nömrəsindəki
+  // məqalələr (məs. 01.12.2026 tarixli, artıq Scopus-da olan) da sayılır
+  const open = !to || to >= today();
+  if(a.date && a.date.length>=10) return (!from || a.date>=from) && (open || a.date<=to);
   if(!a.year) return false;
-  return (!from || a.year>=+from.slice(0,4)) && a.year<=+to.slice(0,4);
+  return (!from || a.year>=+from.slice(0,4)) && (open || a.year<=+to.slice(0,4));
 }
 // LATEST-dən yalnız seçilmiş məqalələrlə statistikanı yenidən hesablayır
 function filtered(pred, label){
