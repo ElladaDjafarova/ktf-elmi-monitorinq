@@ -54,8 +54,27 @@ def prepare():
     docs = os.path.join(documents_dir(), APP_NAME)
     os.makedirs(docs, exist_ok=True)
     xl = os.path.join(docs, "muellimler.xlsx")
+    bundled = os.path.join(res, "muellimler.xlsx")
+    stamp = os.path.join(home, "excel_version.txt")  # son quraşdırılan siyahının imzası
+
+    def digest(path):
+        import hashlib
+        with open(path, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+
+    new_sig = digest(bundled)
+    old_sig = open(stamp).read().strip() if os.path.exists(stamp) else None
     if not os.path.exists(xl):
-        shutil.copyfile(os.path.join(res, "muellimler.xlsx"), xl)
+        shutil.copyfile(bundled, xl)
+    elif new_sig != old_sig and old_sig is not None and digest(xl) == old_sig:
+        # yeni versiyada siyahı yenilənib, istifadəçi öz faylını dəyişməyib → yenisi ilə əvəz et
+        shutil.copyfile(bundled, xl)
+    elif old_sig is None and digest(xl) != new_sig:
+        # ilk versiyadan yenilənmə (imza yox idi): köhnə faylı saxla, yenisini qoy
+        shutil.copyfile(xl, os.path.join(docs, "muellimler_kohne.xlsx"))
+        shutil.copyfile(bundled, xl)
+    with open(stamp, "w") as fh:
+        fh.write(new_sig)
 
     # config: ilk dəfə proqramla gələni köçür, Excel yolunu Sənədlərə yönəlt
     cfg_path = os.path.join(home, "config.json")
