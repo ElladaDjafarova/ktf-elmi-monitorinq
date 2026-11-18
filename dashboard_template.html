@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KTF Elmi Monitorinq</title>
+<style>
+  :root{
+    --navy:#001C80; --navy2:#1F3A9E; --bg:#EEF2F6; --card:#FFFFFF; --line:#DCE3EC; --line2:#EBF0F5;
+    --ink:#1A2433; --muted:#5B6778; --soft:#8B96A5; --amber:#B7791F; --amber-bg:#FBF3E4;
+    --q1:#001C80; --q2:#3049A8; --q3:#7D8ECF; --q4:#C4CDEE; --qn:#D8DDE6; --bar:#7D8ECF;
+    --good:#2E7D4F; --link:#1F3A9E;
+    --serif:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
+    --sans:-apple-system,"Segoe UI","Helvetica Neue",Roboto,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+  a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,tr.click:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+  /* loqo */
+  .logo-bar{background:#fff;border-bottom:1px solid var(--line);text-align:center;padding:16px 20px 14px}
+  .logo-bar img{height:64px;width:auto;display:inline-block}
+  @media (max-width:560px){.logo-bar img{height:46px}}
+  /* universitet başlıq zolağı */
+  .band{background:var(--navy);color:#fff}
+  .band-in{max-width:1180px;margin:0 auto;padding:20px 28px 18px;display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}
+  .uni{font-size:13px;color:#C3CCEE;letter-spacing:.01em}
+  .band h1{font:600 28px/1.15 var(--serif);margin:4px 0 0;letter-spacing:.005em}
+  .band .meta{display:block;font-size:12.5px;color:#C3CCEE;margin-top:6px}
+  .hdr-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .band .seg{border-color:rgba(255,255,255,.25)}
+  .band .seg button{background:transparent;color:#DCE6F1}
+  .band .seg button.on{background:#fff;color:var(--navy)}
+  .cal{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:4px 8px;background:rgba(255,255,255,.06);font-size:13px;color:#fff}
+  .cal input{border:0;font:inherit;background:transparent;color:#fff;color-scheme:dark}
+  .refresh{border:0;background:var(--amber);color:#fff;border-radius:7px;padding:7px 14px;font:600 13px var(--sans);cursor:pointer}
+  .refresh:hover{background:#A26A17}
+  .excelbtn{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:7px;padding:6px 12px;font:600 13px var(--sans);cursor:pointer}
+  .excelbtn:hover{background:rgba(255,255,255,.1)}
+  .refresh:disabled{opacity:.7;cursor:progress}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:6px 28px 64px}
+  .banner{background:#FFF7E3;border:1px solid #EFD9A6;border-radius:8px;padding:10px 14px;margin:16px 0 0;font-size:13px}
+  .banner.hist{background:#E9F0F8;border-color:#C7D7EA}
+  .banner a{color:var(--link);font-weight:600}
+  .progress{background:#E9F0F8;border:1px solid #C7D7EA;border-radius:8px;padding:10px 14px;margin:16px 0 0;font-size:13px}
+
+  .crumb{color:var(--muted);font-size:13px;margin:24px 0 4px}
+  .crumb a{color:var(--link);text-decoration:none}
+  .crumb a:hover{text-decoration:underline}
+  h2{font:600 26px/1.2 var(--serif);margin:2px 0 4px;color:var(--navy)}
+  .sub{color:var(--muted);font-size:13px}
+
+  /* göstəricilər: bir panel, bölücü xətlərlə */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);margin:18px 0;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .kpi{padding:16px 20px;border-left:1px solid var(--line2)}
+  .kpi:first-child{border-left:0}
+  .kpi .l{font-size:12.5px;color:var(--muted)}
+  .kpi .v{font:600 30px/1.1 var(--sans);margin:8px 0 4px;font-variant-numeric:tabular-nums;color:var(--navy);letter-spacing:-.01em}
+  .kpi .v small{font-size:15px;color:var(--soft);font-weight:500}
+  .kpi .d{font-size:12px;color:var(--soft)}
+  .kpi .d.up{color:var(--good)}
+
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px}
+  .card h3{margin:0;font:600 17px/1.3 var(--serif);color:var(--navy)}
+  .card .sub{margin:2px 0 12px}
+  .head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .seg button{border:0;background:#fff;padding:5px 11px;font:600 12px var(--sans);cursor:pointer;color:var(--muted)}
+  .seg button.off{color:#B3BCC8}
+  .seg button.on{background:var(--navy);color:#fff}
+  .stack{display:flex;gap:3px;height:26px;margin:8px 0 10px}
+  .stack div{border-radius:3px;min-width:2px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-bottom:8px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  th{font-weight:600;font-size:12.5px;color:var(--muted);text-align:right;padding:10px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{text-align:right;padding:10px 10px;border-bottom:1px solid var(--line2)}
+  tbody tr:last-child td{border-bottom:0}
+  th:first-child,td:first-child{text-align:left}
+  .qt th,.qt td{text-align:right!important}
+  .gt tr.grp th{border-bottom:0;padding-bottom:2px;font-size:12px;font-weight:600;color:var(--navy)}
+  .gt tr.grp th.g{text-align:center;border-bottom:2px solid var(--q4)}
+  .gt th.yr,.gt td.yr{background:#F5F8FB}
+  .gt th.cur,.gt td.cur{background:var(--amber-bg);color:#7A4E0E;font-weight:600}
+  .gt th{vertical-align:bottom}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:#F2F6FA}
+  tr.click:hover td.cur{background:#F6E7C8}
+  td a{color:var(--link);text-decoration:none;font-weight:600}
+  td a:hover{text-decoration:underline}
+  .muted{color:var(--soft)}
+  .warn{color:#9A5B00;font-size:12px;margin-top:2px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;border-radius:4px;padding:1px 7px;color:#fff}
+  .new{background:#E3F1E8;color:#1E6B3A;font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;margin-left:6px}
+  .tl td,.tl th{text-align:left}
+  .tl td.n,.tl th.n{text-align:right}
+  .search{width:240px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font:inherit;background:#fff}
+  svg text{font-family:var(--sans)}
+  .hb{display:inline-block;height:8px;border-radius:2px;background:var(--q3);margin-right:6px;vertical-align:0}
+  .row2 .tl td{font-size:13px;vertical-align:top}
+  .row2 .tl td.n{white-space:nowrap}
+  .row2 .au{color:var(--muted);font-size:12px}
+  .row2 .ours{color:var(--navy2);font-size:12px;font-weight:600}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .filters select{padding:7px;border:1px solid var(--line);border-radius:7px;font:inherit;background:#fff}
+  .arts td{vertical-align:top;font-size:13px}
+  .arts .t{font-weight:600;color:var(--ink)}
+  .arts .au{color:var(--muted);font-size:12px;margin-top:2px}
+  .arts .ours{color:var(--navy2);font-size:12px;font-weight:600;margin-top:2px}
+  .arts .j{max-width:190px}
+  .arts .doi{max-width:150px;word-break:break-all;font-size:12px}
+  .morebtn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:7px 16px;font:inherit;cursor:pointer;color:var(--navy)}
+
+  /* liderlər */
+  .ld-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:6px;border-top:1px solid var(--line2)}
+  .ld-col{padding:14px 16px 6px;border-left:1px solid var(--line2)}
+  .ld-col:first-child{border-left:0;padding-left:0}
+  .ld-dept{font:600 14px/1.3 var(--serif);margin-bottom:10px}
+  .ld-dept a{color:var(--navy);text-decoration:none}
+  .ld-dept a:hover{text-decoration:underline}
+  .ld-row{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:10px;padding:8px 6px;margin:0 -6px;border-radius:8px;color:inherit;text-decoration:none}
+  .ld-row:hover{background:#F2F6FA}
+  .medal{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:700 13px var(--sans);color:#fff;box-shadow:inset 0 -2px 0 rgba(0,0,0,.15)}
+  .medal.m1{background:linear-gradient(145deg,#E7C45A,#B8891C)}
+  .medal.m2{background:linear-gradient(145deg,#C9D1DA,#8E99A6)}
+  .medal.m3{background:linear-gradient(145deg,#D99A63,#9C5A2A)}
+  .ld-main{min-width:0}
+  .ld-name{display:block;font-weight:600;font-size:13px;line-height:1.3;color:var(--ink)}
+  .ld-bar{display:block;height:5px;background:var(--line2);border-radius:3px;margin-top:5px;overflow:hidden}
+  .ld-bar i{display:block;height:100%;background:var(--q2);border-radius:3px}
+  .ld-row:first-of-type .ld-bar i{background:var(--amber)}
+  .ld-val{font:600 15px var(--sans);color:var(--navy);font-variant-numeric:tabular-nums}
+  .ld-empty{font-size:13px;padding:6px 0}
+  .ld-note{font-size:12px;color:var(--soft);margin-top:10px;border-top:1px solid var(--line2);padding-top:10px}
+  @media (max-width:900px){.ld-grid{grid-template-columns:1fr 1fr}.ld-col:nth-child(3){border-left:0;padding-left:0}}
+  @media (max-width:560px){.ld-grid{grid-template-columns:1fr}.ld-col{border-left:0;padding-left:0}}
+  @media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.kpi{border-top:1px solid var(--line2)}.row2{grid-template-columns:1fr}.band h1{font-size:23px}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="logo-bar"><img src="data:image/png;base64,__LOGO_B64__" alt="Azərbaycan Dövlət Neft və Sənaye Universiteti" id="logo"></div>
+<div class="band"><div class="band-in">
+  <div>
+    <div class="uni" id="uni"></div>
+    <h1 id="title">Elmi monitorinq</h1>
+    <span class="meta" id="meta"></span>
+  </div>
+  <div class="hdr-r">
+    <span class="seg" id="langsel"><button data-l="az">AZ</button><button data-l="en">EN</button><button data-l="ru">RU</button></span>
+    <span class="seg" id="calmode"><button data-m="day" class="on" data-i18n="day">Gün</button><button data-m="range" data-i18n="range">Aralıq</button></span>
+    <label class="cal" id="callbl"><input type="date" id="cal"><span id="cal2wrap" style="display:none">–<input type="date" id="cal2"></span></label>
+    <button id="excelbtn" class="excelbtn" style="display:none"></button>
+    <button id="refresh" class="refresh"></button>
+  </div>
+</div></div>
+<div class="wrap">
+  <div id="banner"></div>
+  <div id="view"></div>
+</div>
+<script>
+const I18N = {"uni": ["Azərbaycan Dövlət Neft və Sənaye Universiteti", "Azerbaijan State Oil and Industry University", "Азербайджанский государственный университет нефти и промышленности"], "title": ["Elmi monitorinq", "Research monitoring", "Научный мониторинг"], "day": ["Gün", "Day", "День"], "range": ["Aralıq", "Range", "Период"], "calTitle": ["Dərc tarixinə görə süz", "Filter by publication date", "Фильтр по дате публикации"], "date": ["Tarix", "Date", "Дата"], "dateEnd": ["Son tarix", "End date", "Конечная дата"], "refresh": ["⟳ Yenilə", "⟳ Refresh", "⟳ Обновить"], "refreshing": ["⟳ Yenilənir...", "⟳ Refreshing...", "⟳ Обновление..."], "refreshTitle": ["Scopus-dan məlumatı indi yenilə", "Fetch the latest data from Scopus now", "Загрузить свежие данные из Scopus"], "metaFilter": ["Filtr aktivdir. Son yenilənmə {0}", "Filter applied. Last updated {0}", "Фильтр включён. Обновлено {0}"], "metaRange": ["Aralıq: {0}", "Range: {0}", "Период: {0}"], "metaLast": ["Son yenilənmə {0}", "Last updated {0}", "Обновлено {0}"], "metaDay": ["Göstərilən gün {0}", "Showing {0}", "Показан день {0}"], "source": ["Mənbə: Scopus", "Source: Scopus", "Источник: Scopus"], "andSj": [" və SCImago", " and SCImago", " и SCImago"], "demo": ["<b>Nümunə məlumat.</b> Bu səhifə dizaynı göstərmək üçündür; məqalələr və rəqəmlər real deyil.", "<b>Sample data.</b> This page shows the design only; articles and figures are not real.", "<b>Демо-данные.</b> Страница показывает только дизайн; статьи и цифры не настоящие."], "err0": ["<b>Scopus-dan məqalə alınmadı.</b> API sorğuları 401 (icazə yoxdur) qaytardı. Proqramı universitetin şəbəkəsində yenidən işə salın və ya config.json-a insttoken əlavə edin.", "<b>No articles were received from Scopus.</b> The API returned 401 (not authorised). Run the program on the university network or add an insttoken to config.json.", "<b>Статьи из Scopus не получены.</b> API вернул 401 (нет доступа). Запустите программу в сети университета или добавьте insttoken в config.json."], "growth": [" Scopus-da bu dövrdə ({0} → {1}) <b>+{2}</b> məqalə, <b>+{3}</b> istinad əlavə olunub.", " In Scopus, <b>+{2}</b> articles and <b>+{3}</b> citations were added in this period ({0} → {1}).", " За этот период ({0} → {1}) в Scopus добавлено <b>+{2}</b> статей и <b>+{3}</b> цитирований."], "filterB": ["{0} məqalə. İstinadlar bugünkü saydır.", "{0} articles. Citation counts are as of today.", "Статей: {0}. Цитирования — на сегодня."], "showAll": ["Hamısını göstər", "Show all", "Показать всё"], "rangeB": ["Aralıq: <b>{0}</b>. Bu dövrdə <b>+{1}</b> məqalə, <b>+{2}</b> istinad.", "Range: <b>{0}</b>. <b>+{1}</b> articles and <b>+{2}</b> citations in this period.", "Период: <b>{0}</b>. За период <b>+{1}</b> статей, <b>+{2}</b> цитирований."], "histB": ["<b>{0}</b> tarixli məlumata baxırsınız.", "You are viewing data from <b>{0}</b>.", "Вы смотрите данные за <b>{0}</b>."], "back": ["Ən son vəziyyətə qayıt", "Back to latest", "Вернуться к последним данным"], "firstCheck": ["ilk yoxlama", "first check", "первая проверка"], "inRange": ["{0} seçilmiş aralıqda", "{0} in selected range", "{0} за выбранный период"], "sinceLast": ["{0} son yoxlamadan", "{0} since last check", "{0} с прошлой проверки"], "nArticles": ["{0} məqalə", "{0} articles", "{0} статей"], "quart": ["Jurnal kvartilləri", "Journal quartiles", "Квартили журналов"], "quartSub": ["Məqalənin dərc olunduğu ilin kvartili", "Quartile in the year of publication", "Квартиль в год публикации"], "sjrMissing": ["SCImago cədvəlləri hələ yüklənməyib — klikləyin", "SCImago tables are not loaded yet — click", "Таблицы SCImago ещё не загружены — нажмите"], "sjrTitle": ["SCImago SJR kvartili", "SCImago SJR quartile", "Квартиль SCImago SJR"], "noQ": ["Kvartilsiz", "No quartile", "Без квартиля"], "total": ["Cəmi", "Total", "Всего"], "kUnique": ["Unikal məqalə", "Unique articles", "Уникальные статьи"], "newN": ["+{0} yeni", "+{0} new", "+{0} новых"], "kCit": ["İstinad", "Citations", "Цитирования"], "kYear": ["{0} məqalə", "{0} articles", "Статьи {0}"], "kQ12": ["Q1 + Q2 ({0})", "Q1 + Q2 ({0})", "Q1 + Q2 ({0})"], "ofAll": ["bütün məqalələrdən", "of all articles", "из всех статей"], "byYear": ["İllər üzrə məqalə sayı", "Articles per year", "Статьи по годам"], "byYearSub": ["Son {0} il, unikal məqalələr", "Last {0} years, unique articles", "Последние {0} лет, уникальные статьи"], "artSub": ["məqalə; fakültə müəllimləri qalın şriftlə", "articles; faculty members in bold", "статей; сотрудники факультета выделены"], "allYears": ["Bütün illər", "All years", "Все годы"], "allQ": ["Bütün kvartillər", "All quartiles", "Все квартили"], "searchPh": ["Başlıq, müəllif, jurnal, DOI", "Title, author, journal, DOI", "Название, автор, журнал, DOI"], "thArtAu": ["Məqalə və müəlliflər", "Article and authors", "Статья и авторы"], "thJournal": ["Jurnal", "Journal", "Журнал"], "thYear": ["İl", "Year", "Год"], "newTag": ["yeni", "new", "новая"], "auUnknown": ["müəlliflər məlum deyil", "authors unknown", "авторы неизвестны"], "andOthers": [" və b. ({0})", " et al. ({0})", " и др. ({0})"], "jCount": ["Jurnal sayı", "Journals", "Журналов"], "distinctJ": ["fərqli jurnal", "distinct journals", "разных журналов"], "avgCit": ["Orta istinad", "Average citations", "Среднее цитирований"], "perArt": ["məqalə başına", "per article", "на статью"], "noCit": ["İstinadsız məqalə", "Uncited articles", "Статьи без цитирований"], "avgAu": ["Orta müəllif sayı", "Average authors", "Среднее число авторов"], "withDoi": ["DOI-si olan", "With DOI", "С DOI"], "artWord": ["məqalə", "articles", "статей"], "jStats": ["Jurnallar üzrə statistika", "Journal statistics", "Статистика по журналам"], "jStatsSub": ["Ən çox dərc olunan {0} jurnal; kvartil: {1} (ən çox rast gələn)", "Top {0} journals by articles; quartile: {1} (most frequent)", "Топ-{0} журналов по числу статей; квартиль: {1} (наиболее частый)"], "thArticle": ["Məqalə", "Article", "Статья"], "thQ": ["Kvartil", "Quartile", "Квартиль"], "thLast": ["Son", "Latest", "Последняя"], "topCited": ["Ən çox istinad olunan məqalələr", "Most cited articles", "Самые цитируемые статьи"], "topCitedSub": ["Scopus istinad sayına görə; fakültə müəllimləri qalın şriftlə", "By Scopus citation count; faculty members in bold", "По числу цитирований в Scopus; сотрудники факультета выделены"], "more": ["Daha çox göstər ({0})", "Show more ({0})", "Показать ещё ({0})"], "gTotal": ["Ümumi", "Overall", "Всего"], "gQuart": ["Jurnal kvartili, {0}", "Journal quartile, {0}", "Квартиль журнала, {0}"], "gYears": ["Məqalə sayı, illər üzrə", "Articles by year", "Статьи по годам"], "thArtTitle": ["Scopus-dakı unikal məqalə sayı", "Unique articles in Scopus", "Уникальные статьи в Scopus"], "thCitTitle": ["Ümumi istinad sayı", "Total citations", "Всего цитирований"], "kWithId": ["Scopus ID-si olan", "With a Scopus ID", "Со Scopus ID"], "teachersW": ["müəllim", "staff", "преподавателей"], "facSub": ["{0} kafedra, {1} müəllim", "{0} departments, {1} staff", "Кафедр: {0}, преподавателей: {1}"], "depts": ["Kafedralar", "Departments", "Кафедры"], "deptsSub": ["Kafedraya keçmək üçün sətrə klikləyin. Ortaq məqalələr fakültə cəmində bir dəfə sayılır.", "Click a row to open the department. Shared articles are counted once in faculty totals.", "Нажмите на строку, чтобы открыть кафедру. Совместные статьи учитываются в итогах один раз."], "thDept": ["Kafedra", "Department", "Кафедра"], "thTeachers": ["Müəllim", "Staff", "Преподаватели"], "thTeachersTitle": ["Müəllim sayı", "Number of staff", "Число преподавателей"], "allArts": ["Bütün məqalələr", "All articles", "Все статьи"], "deptSub": ["{0} müəllim", "{0} staff", "Преподавателей: {0}"], "teachersT": ["Müəllimlər", "Staff", "Преподаватели"], "teachersSub": ["Müəllimin məqalələrinə baxmaq üçün sətrə klikləyin", "Click a row to see the person's articles", "Нажмите на строку, чтобы увидеть статьи"], "thTeacher": ["Müəllim", "Name", "ФИО"], "hTitle": ["Hirş indeksi", "Hirsch index", "Индекс Хирша"], "deptArts": ["Kafedranın məqalələri", "Department articles", "Статьи кафедры"], "arts": ["Məqalələr", "Articles", "Статьи"], "noId": ["Scopus ID yoxdur", "No Scopus ID", "Нет Scopus ID"], "checkExcel": [" — Excel-i yoxlayın", " — check the Excel file", " — проверьте Excel"], "dupId": ["Scopus ID {0} başqa müəllimdə də yazılıb: {1}", "Scopus ID {0} is also assigned to: {1}", "Scopus ID {0} также указан у: {1}"], "err401": ["Scopus API icazə vermədi (401). Proqramı universitetin şəbəkəsində işə salın.", "Scopus API denied access (401). Run the program on the university network.", "Scopus API отказал в доступе (401). Запустите программу в сети университета."], "profile": ["Scopus profili", "Scopus profile", "Профиль Scopus"], "sjrHelp": ["<b>SJR kvartilləri hələ yoxdur.</b> SCImago saytı avtomatik yükləməni bloklayır, ona görə cədvəlləri bir dəfə brauzerdən yükləmək lazımdır. Aşağıdakı illərə klikləyin (fayllar Downloads-a düşəcək), sonra <b>Yenilə</b> düyməsini basın:", "<b>SJR quartiles are not available yet.</b> SCImago blocks automatic downloads, so download the tables once in your browser. Click the years below (files go to Downloads), then press <b>Refresh</b>:", "<b>Квартилей SJR пока нет.</b> SCImago блокирует автоматическую загрузку, поэтому скачайте таблицы один раз в браузере. Нажмите на годы ниже (файлы попадут в «Загрузки»), затем нажмите <b>Обновить</b>:"], "sjrHelp2": ["Sayt \"insan olduğunuzu\" yoxlaya bilər — bir dəfə təsdiqləyin. İldə bir dəfə yeniləmək kifayətdir.", "The site may ask you to confirm you are human. Updating once a year is enough.", "Сайт может попросить подтвердить, что вы человек. Достаточно обновлять раз в год."], "fDay": ["{0} tarixinə qədər dərc olunmuş məqalələr", "Articles published up to {0}", "Статьи, опубликованные до {0}"], "fRange": ["{0} – {1} arasında dərc olunmuş məqalələr", "Articles published {0} – {1}", "Статьи, опубликованные {0} – {1}"], "needServer": ["Bu funksiya üçün dashboard-u proqram ilə açın (python3 scopus_monitor.py).", "Open the dashboard through the program for this (python3 scopus_monitor.py).", "Для этого откройте дашборд через программу (python3 scopus_monitor.py)."], "dayFail": ["Seçilən günün məlumatı açılmadı.", "Could not open data for the selected day.", "Не удалось открыть данные за выбранный день."], "updating": ["<b>Scopus-dan yenilənir…</b> ", "<b>Refreshing from Scopus…</b> ", "<b>Обновление из Scopus…</b> "], "errL": ["<b>Xəta:</b> ", "<b>Error:</b> ", "<b>Ошибка:</b> "], "closed": ["Proqram bağlıdır. Yeniləmək üçün proqramı işə salın (python3 scopus_monitor.py).", "The program is not running. Start it to refresh (python3 scopus_monitor.py).", "Программа не запущена. Запустите её для обновления (python3 scopus_monitor.py)."], "fileOpen": ["Bu səhifə fayl kimi açılıb. Düymənin işləməsi üçün dashboard-u proqram ilə açın (python3 scopus_monitor.py).", "This page was opened as a file. Open it through the program for the button to work (python3 scopus_monitor.py).", "Страница открыта как файл. Чтобы кнопка работала, откройте её через программу (python3 scopus_monitor.py)."], "faculty": ["Kimya texnologiyaları fakültəsi", "Faculty of Chemical Technologies", "Факультет химических технологий"], "leaders": ["Kafedraların liderləri", "Department leaders", "Лидеры кафедр"], "leadersSub": ["Hər kafedradan {0}-ci il üzrə ən yüksək nəticəli 3 müəllim", "Top 3 staff in each department for {0}", "Три лучших преподавателя каждой кафедры за {0} год"], "mScore": ["Bal", "Score", "Балл"], "mArts": ["Məqalə", "Articles", "Статьи"], "mCit": ["İstinad", "Citations", "Цитирования"], "scoreHelp": ["Yalnız {1}-ci ildə dərc olunmuş məqalələr sayılır. Bal = hər məqalə üçün kvartil çəkisi (Q1 = 4, Q2 = 3, Q3 = 2, Q4 = 1, kvartilsiz = 0,5) + həmin məqalələrin istinad sayının onda biri. Kvartil mənbəyi: {0}.", "Only articles published in {1} are counted. Score = quartile weight per article (Q1 = 4, Q2 = 3, Q3 = 2, Q4 = 1, no quartile = 0.5) + one tenth of those articles' citations. Quartile source: {0}.", "Учитываются только статьи {1} года. Балл = вес квартиля за каждую статью (Q1 = 4, Q2 = 3, Q3 = 2, Q4 = 1, без квартиля = 0,5) + десятая часть цитирований этих статей. Источник квартилей: {0}."], "noLeaders": ["Bu kafedrada {0}-ci ildə hələ məqalə yoxdur.", "No articles in this department in {0} yet.", "У кафедры пока нет статей за {0} год."], "place": ["{0}-ci yer", "{0} place", "{0} место"], "yearNote": ["Yalnız {0}-ci ildə dərc olunmuş məqalələr sayılır.", "Only articles published in {0} are counted.", "Учитываются только статьи {0} года."], "excelBtn": ["Müəllim siyahısı (Excel)", "Staff list (Excel)", "Список преподавателей (Excel)"], "excelTitle": ["Müəllim siyahısını açıb dəyişin. Yadda saxlayandan sonra Yenilə düyməsini basın.", "Open and edit the staff list. After saving, press Refresh.", "Откройте и измените список. После сохранения нажмите «Обновить»."]};
+const NAMES = {"Kimya": ["Kimya", "Chemistry", "Химия"], "Neft-kimya mühəndisliyi": ["Neft-kimya mühəndisliyi", "Petrochemical Engineering", "Нефтехимическая инженерия"], "Biotexnologiya və qida müh.": ["Biotexnologiya və qida müh.", "Biotechnology and Food Engineering", "Биотехнология и пищевая инженерия"], "Proses təhlükəsizliyi müh.": ["Proses təhlükəsizliyi müh.", "Process Safety Engineering", "Инженерия промышленной безопасности"], "kafedra müdiri": ["Kafedra müdiri", "Head of Department", "Заведующий кафедрой"], "dekan": ["Dekan", "Dean", "Декан"], "dekan müavini": ["Dekan müavini", "Deputy Dean", "Заместитель декана"], "professor": ["Professor", "Professor", "Профессор"], "dosent": ["Dosent", "Associate Professor", "Доцент"], "baş müəllim": ["Baş müəllim", "Senior Lecturer", "Старший преподаватель"], "müəllim": ["Müəllim", "Lecturer", "Преподаватель"], "tyutor": ["Tyutor", "Tutor", "Тьютор"], "baş laborant": ["Baş laborant", "Senior Lab Assistant", "Старший лаборант"], "laborant": ["Laborant", "Lab Assistant", "Лаборант"], "böyük tədqiqatçı": ["Böyük tədqiqatçı", "Senior Researcher", "Старший научный сотрудник"]};
+const LANGS = ['az','en','ru'];
+let LANG = (()=>{ try{ const l=localStorage.getItem('lang'); return LANGS.includes(l)?l:'az'; }catch(e){ return 'az'; } })();
+function tr(k, ...a){ const v=(I18N[k]||[k])[LANGS.indexOf(LANG)] ?? I18N[k][0]; return v.replace(/\{(\d)\}/g,(m,i)=>a[+i]); }
+function nm(s){ if(LANG==='az' || !s) return s; const e=NAMES[s]||NAMES[String(s).trim().toLowerCase()]; return e? e[LANGS.indexOf(LANG)] : s; }
+function warnTr(w){ return String(w).split('; ').map(x=>{ const m=x.match(/^Scopus ID (\d+) başqa müəllimdə də yazılıb: (.*)$/); return m? tr('dupId',m[1],m[2]) : x; }).join('; '); }
+function errTr(e){ return /401/.test(e) ? tr('err401') : e; }
+let D = /*__DATA__*/null;
+const LATEST = D;
+const QC = {Q1:'var(--q1)',Q2:'var(--q2)',Q3:'var(--q3)',Q4:'var(--q4)',none:'var(--qn)'};
+let qMode = (D.has_sjr===false) ? 'cs' : (localGet('qmode') || 'cs');  // CiteScore bütün jurnallar üçün var
+
+function localGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function localSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+const fmt = n => (n==null?'—':Number(n).toLocaleString('en-US'));
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function applyMeta(){
+  applyStatic();
+  document.title = D.faculty_short + ' — ' + tr('title');
+  const upd = d => d.slice(8,10)+'.'+d.slice(5,7)+'.'+d.slice(0,4)+', '+d.slice(11,16);
+  document.getElementById('meta').textContent =
+    (D.filterLabel ? tr('metaFilter', upd(LATEST.updated))
+     : D.rangeLabel ? tr('metaRange', D.rangeLabel)
+     : (D===LATEST ? tr('metaLast', upd(D.updated)) : tr('metaDay', upd(D.updated))))
+    + '. ' + tr('source') + (D.has_sjr===false ? '' : tr('andSj')) + '.';
+  let b='';
+  if (D.demo) b += '<div class="banner">'+tr('demo')+'</div>';
+  else if (D.faculty.articles===0) b += '<div class="banner">'+tr('err0')+'</div>';
+  if (D.filterLabel){
+    const g = D.growth ? tr('growth', fmtD(D.growth.from), fmtD(D.growth.to), fmt(D.growth.art), fmt(D.growth.cit)) : '';
+    b += `<div class="banner hist"><b>${esc(D.filterLabel)}</b>. ${tr('filterB', fmt(D.faculty.articles))}${g} <a href="#" id="tolatest">${tr('showAll')}</a></div>`;
+  }
+  else if (D.rangeLabel) b += `<div class="banner hist">${tr('rangeB', esc(D.rangeLabel), fmt(D.faculty.delta_articles), fmt(D.faculty.delta_citations))} <a href="#" id="tolatest">${tr('back')}</a></div>`;
+  else if (D!==LATEST) b += `<div class="banner hist">${tr('histB', esc(D.updated.slice(0,10)))} <a href="#" id="tolatest">${tr('back')}</a></div>`;
+  document.getElementById('banner').innerHTML = b;
+  const tl=document.getElementById('tolatest'); if(tl) tl.onclick=e=>{e.preventDefault(); D=LATEST; clearSel(); setMode('day'); cal.value=today(); cal2.value=today(); const p=document.getElementById('prog'); if(p) p.remove(); applyMeta(); render();};
+  if (D.has_sjr===false) qMode='cs';
+}
+
+function applyStatic(){
+  document.documentElement.lang = LANG;
+  document.getElementById('uni').textContent = tr('uni');
+  document.getElementById('title').textContent = tr('title');
+  document.querySelectorAll('[data-i18n]').forEach(e=>e.textContent=tr(e.dataset.i18n));
+  document.getElementById('callbl').title = tr('calTitle');
+  document.getElementById('cal').setAttribute('aria-label', tr('date'));
+  document.getElementById('cal2').setAttribute('aria-label', tr('dateEnd'));
+  const xb=document.getElementById('excelbtn'); xb.textContent=tr('excelBtn'); xb.title=tr('excelTitle');
+  const rb=document.getElementById('refresh'); rb.title=tr('refreshTitle'); if(!rb.disabled) rb.textContent=tr('refresh');
+  document.querySelectorAll('#langsel button').forEach(b=>b.classList.toggle('on', b.dataset.l===LANG));
+}
+document.querySelectorAll('#langsel button').forEach(b=>b.onclick=()=>{
+  LANG=b.dataset.l; try{ localStorage.setItem('lang',LANG); }catch(e){}
+  if(D.filterLabel && typeof onCal==='function') onCal(); else { applyMeta(); render(); }
+});
+
+function kpi(label, value, note, up){
+  return `<div class="kpi"><div class="l">${label}</div><div class="v">${value}</div><div class="d ${up?'up':''}">${note||'&nbsp;'}</div></div>`;
+}
+function delta(n){ if(n==null) return tr('firstCheck'); const v=(n>=0?'+':'')+fmt(n); return D.rangeLabel ? tr('inRange',v) : tr('sinceLast',v); }
+
+function barChart(years, vals){
+  const W=460,H=170,pl=28,pb=22,pt=8, max=Math.max(5,...vals);
+  const step = max<=10?2: max<=30?10: max<=100?20: Math.ceil(max/4/50)*50;
+  const top = Math.ceil(max/step)*step;
+  const bw=(W-pl)/years.length;
+  let g='';
+  for(let v=0; v<=top; v+=step){
+    const y = pt+(H-pt-pb)*(1-v/top);
+    g+=`<line x1="${pl}" x2="${W}" y1="${y}" y2="${y}" stroke="#E6ECF2"/><text x="${pl-6}" y="${y+4}" font-size="10" fill="#8B96A5" text-anchor="end">${v}</text>`;
+  }
+  years.forEach((yr,i)=>{
+    const h=(H-pt-pb)*(vals[i]/top), x=pl+i*bw+bw*0.22, w=bw*0.56, y=H-pb-h;
+    g+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${yr===D.this_year?'var(--amber)':'var(--bar)'}"><title>${yr}: ${tr('nArticles',vals[i])}</title></rect>`;
+    g+=`<text x="${x+w/2}" y="${H-6}" font-size="10" fill="${yr===D.this_year?'#7A4E0E':'#8B96A5'}" font-weight="${yr===D.this_year?700:400}" text-anchor="middle">'${String(yr).slice(2)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${tr('byYear')}">${g}</svg>`;
+}
+
+function quartCard(q, total){
+  const keys=['Q1','Q2','Q3','Q4','none'];
+  const stack = keys.filter(k=>q[k]>0).map(k=>`<div style="flex:${q[k]};background:${QC[k]}" title="${k==='none'?tr('noQ'):k}: ${q[k]}"></div>`).join('');
+  const leg = keys.map(k=>`<span><i style="background:${QC[k]}"></i>${k==='none'?tr('noQ'):k} · ${q[k]}</span>`).join('');
+  return `<div class="card">
+    <div class="head"><div><h3>${tr('quart')}</h3><div class="sub">${tr('quartSub')}</div></div>
+      <div class="seg"><button data-q="sjr" class="${qMode==='sjr'?'on':''} ${D.has_sjr===false?'off':''}" title="${D.has_sjr===false?tr('sjrMissing'):tr('sjrTitle')}">SJR</button><button data-q="cs" class="${qMode==='cs'?'on':''}">CiteScore</button></div></div>
+    <div class="stack">${stack||'<div style="flex:1;background:var(--qn)"></div>'}</div>
+    <div class="legend">${leg}</div>
+    <table class="qt"><tr><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>${tr('noQ')}</th><th>${tr('total')}</th></tr>
+      <tr><td>${q.Q1}</td><td>${q.Q2}</td><td>${q.Q3}</td><td>${q.Q4}</td><td>${q.none}</td><td>${total}</td></tr></table>
+  </div>`;
+}
+
+function topBlock(s, byYear, extraKpi){
+  const q = s[qMode];
+  return `<div class="kpis">
+      ${kpi(tr('kUnique'), fmt(s.articles), s.delta_articles!==undefined? delta(s.delta_articles) : (s.new? tr('newN',s.new):''), (s.delta_articles>0)||(s.delta_articles===undefined&&s.new>0))}
+      ${kpi(tr('kCit'), fmt(s.citations), s.delta_citations!==undefined? delta(s.delta_citations):'', s.delta_citations>0)}
+      ${kpi(tr('kYear',D.this_year), fmt(s.this_year), (D.this_year-1)+': '+fmt(s.last_year))}
+      ${kpi(tr('kQ12',qMode==='sjr'?'SJR':'CiteScore'), fmt(q.Q1+q.Q2), tr('ofAll'))}
+      ${extraKpi}
+    </div>
+    <div class="row2">
+      <div class="card"><h3>${tr('byYear')}</h3><div class="sub">${tr('byYearSub',D.years.length)}</div>${barChart(D.years, byYear)}</div>
+      ${quartCard(q, s.articles)}
+    </div>`;
+}
+
+function byYearOf(eids){ return D.years.map(y=>eids.filter(e=>D.articles[e] && D.articles[e].year===y).length); }
+
+// ---------------- articles table (hər səviyyədə)
+let artLimit = 25;
+function qPill(q){ return q?`<span class="pill" style="background:${QC[q]}">${q}</span>`:'<span class="muted">—</span>'; }
+function articleTable(eids, title){
+  const arts = [...new Set(eids)].map(e=>({e,...D.articles[e]})).filter(a=>a.title!==undefined)
+    .sort((a,b)=>(b.year||0)-(a.year||0)||b.cited-a.cited);
+  const years = [...new Set(arts.map(a=>a.year).filter(Boolean))].sort((a,b)=>b-a);
+  return `<div class="card"><div class="head"><div><h3>${title}</h3><div class="sub"><span id="artcount">${arts.length}</span> ${tr('artSub')}</div></div>
+    <div class="filters"><select id="fy"><option value="">${tr('allYears')}</option>${years.map(y=>`<option>${y}</option>`).join('')}</select>
+      <select id="fq"><option value="">${tr('allQ')}</option><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option><option value="none">${tr('noQ')}</option></select>
+      <input class="search" id="q" placeholder="${tr('searchPh')}"></div></div>
+    <table class="tl arts" id="arts"><thead><tr><th>${tr('thArtAu')}</th><th>${tr('thJournal')}</th><th class="n">${tr('thYear')}</th><th>DOI</th><th class="n">SJR</th><th class="n">CiteScore</th><th class="n">${tr('kCit')}</th></tr></thead>
+    <tbody>${arts.map(a=>{
+      const ours = new Set((a.ours||[]).map(n=>n.toLowerCase()));
+      const au = (a.authors||[]).map(n=>esc(n)).join(', ');
+      const oursTxt = (a.ours||[]).length?`<div class="ours">${a.ours.map(esc).join(', ')}</div>`:'';
+      return `<tr data-y="${a.year||''}" data-qs="${a.q_sjr||'none'}" data-qc="${a.q_cs||'none'}">
+        <td><b class="t">${esc(a.title)}</b>${a.new?'<span class="new">'+tr('newTag')+'</span>':''}<div class="au">${au||'<span class="muted">'+tr('auUnknown')+'</span>'}</div>${oursTxt}</td>
+        <td class="j">${esc(a.journal)}${a.volume?`<div class="muted">Cild ${esc(a.volume)}${a.pages?', s. '+esc(a.pages):''}</div>`:''}</td>
+        <td class="n">${a.year??''}</td>
+        <td class="doi">${a.doi?`<a href="https://doi.org/${esc(a.doi)}" target="_blank" rel="noopener">${esc(a.doi)}</a>`:'<span class="muted">—</span>'}</td>
+        <td class="n">${qPill(a.q_sjr)}</td><td class="n">${qPill(a.q_cs)}</td><td class="n">${a.cited}</td></tr>`;}).join('')}</tbody></table>
+    <div id="more" style="text-align:center;margin-top:10px"></div></div>`;
+}
+function mode(arr){ const c={}; arr.forEach(x=>{if(x)c[x]=(c[x]||0)+1}); return Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b))[0]||null; }
+function statsBlock(eids){
+  const arts=[...new Set(eids)].map(e=>D.articles[e]).filter(Boolean);
+  if(!arts.length) return '';
+  const J={};
+  arts.forEach(a=>{const k=a.journal||'—';(J[k]=J[k]||{n:0,c:0,qs:[],qc:[],last:0}); J[k].n++; J[k].c+=a.cited; J[k].qs.push(a.q_sjr); J[k].qc.push(a.q_cs); J[k].last=Math.max(J[k].last,a.year||0);});
+  const js=Object.entries(J).sort((a,b)=>b[1].n-a[1].n||b[1].c-a[1].c).slice(0,12);
+  const maxN=js.length?js[0][1].n:1;
+  const jrows=js.map(([name,v])=>`<tr><td>${esc(name)}</td><td class="n"><span class="hb" style="width:${Math.max(4,70*v.n/maxN)}px"></span>${v.n}</td><td class="n">${fmt(v.c)}</td><td class="n">${qPill(mode(qMode==='sjr'?v.qs:v.qc))}</td><td class="n">${v.last||''}</td></tr>`).join('');
+  const top=arts.slice().sort((a,b)=>b.cited-a.cited).slice(0,8);
+  const trows=top.map((a,k)=>`<tr><td><span class="muted">${k+1}.</span> ${a.doi?`<a href="https://doi.org/${esc(a.doi)}" target="_blank" rel="noopener">${esc(a.title)}</a>`:esc(a.title)}<div class="au">${(a.authors||[]).length?esc(a.authors.slice(0,6).join(', '))+(a.authors.length>6?tr('andOthers',a.authors.length):''):'<span class="muted">'+tr('auUnknown')+'</span>'}</div>${(a.ours||[]).length?`<div class="ours">${a.ours.map(esc).join(', ')}</div>`:''}<div class="au">${esc(a.journal)} · ${a.year??''}</div></td><td class="n">${qPill(qMode==='sjr'?a.q_sjr:a.q_cs)}</td><td class="n"><b>${a.cited}</b></td></tr>`).join('');
+  const nJ=Object.keys(J).length, avg=(arts.reduce((s,a)=>s+a.cited,0)/arts.length).toFixed(1);
+  const withDoi=arts.filter(a=>a.doi).length, nAu=arts.reduce((s,a)=>s+(a.authors||[]).length,0)/arts.length;
+  return `<div class="kpis k4">
+      ${kpi(tr('jCount'), fmt(nJ), tr('distinctJ'))}
+      ${kpi(tr('avgCit'), avg, tr('perArt'))}
+      ${kpi(tr('noCit'), fmt(arts.filter(a=>!a.cited).length), Math.round(100*arts.filter(a=>!a.cited).length/arts.length)+'%')}
+      ${kpi(tr('avgAu'), nAu.toFixed(1), tr('perArt'))}
+      ${kpi(tr('withDoi'), fmt(withDoi)+' <small>/ '+arts.length+'</small>', tr('artWord'))}
+    </div>
+    <div class="row2">
+      <div class="card"><h3>${tr('jStats')}</h3><div class="sub">${tr('jStatsSub', js.length, qMode==='sjr'?'SJR':'CiteScore')}</div>
+        <table class="tl"><tr><th>${tr('thJournal')}</th><th class="n">${tr('thArticle')}</th><th class="n">${tr('kCit')}</th><th class="n">${tr('thQ')}</th><th class="n">${tr('thLast')}</th></tr>${jrows}</table></div>
+      <div class="card"><h3>${tr('topCited')}</h3><div class="sub">${tr('topCitedSub')}</div>
+        <table class="tl"><tr><th>${tr('thArticle')}</th><th class="n">${tr('thQ')}</th><th class="n">${tr('kCit')}</th></tr>${trows}</table></div>
+    </div>`;
+}
+
+function wireArticles(){
+  const s=document.getElementById('q'); if(!s) return;
+  const fy=document.getElementById('fy'), fq=document.getElementById('fq'), more=document.getElementById('more');
+  const apply=()=>{
+    const t=s.value.toLowerCase(), y=fy.value, q=fq.value, key=qMode==='sjr'?'qs':'qc'; let n=0, shown=0;
+    document.querySelectorAll('#arts tbody tr').forEach(r=>{
+      const ok=(!t||r.textContent.toLowerCase().includes(t))&&(!y||r.dataset.y===y)&&(!q||r.dataset[key]===q);
+      if(ok) n++;
+      const vis = ok && n<=artLimit; r.style.display=vis?'':'none'; if(vis) shown++;
+    });
+    document.getElementById('artcount').textContent=n;
+    more.innerHTML = n>shown?`<button class="morebtn">${tr('more',n-shown)}</button>`:'';
+    const b=more.querySelector('button'); if(b) b.onclick=()=>{artLimit+=100;apply();};
+  };
+  s.oninput=fy.onchange=fq.onchange=()=>{artLimit=25;apply();};
+  apply();
+}
+
+// ---------------- cədvəl başlığı: qruplanmış sütunlar, son 3 il
+function lastYears(){ return [D.this_year-2, D.this_year-1, D.this_year]; }
+function yearCells(eids){ return lastYears().map(y=>`<td class="yr${y===D.this_year?' cur':''}">${eids.filter(e=>D.articles[e] && D.articles[e].year===y).length}</td>`).join(''); }
+function groupHead(first, extraCols){
+  const qn = qMode==='sjr'?'SJR':'CiteScore', ys = lastYears();
+  const n = 1 + extraCols.length;
+  return `<thead>
+    <tr class="grp"><th colspan="${n}"></th><th colspan="2" class="g">${tr('gTotal')}</th><th colspan="4" class="g">${tr('gQuart',qn)}</th><th colspan="3" class="g">${tr('gYears')}</th></tr>
+    <tr><th>${first}</th>${extraCols.map(c=>`<th title="${c[1]||''}">${c[0]}</th>`).join('')}
+      <th title="${tr('thArtTitle')}">${tr('thArticle')}</th><th title="${tr('thCitTitle')}">${tr('kCit')}</th>
+      <th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th>
+      ${ys.map(y=>`<th class="yr${y===D.this_year?' cur':''}">${y}</th>`).join('')}</tr></thead>`;
+}
+
+// ---------------- Kafedraların liderləri (motivasiya)
+const QW = {Q1:4,Q2:3,Q3:2,Q4:1,none:0.5};
+let lMetric = localGet('lmetric') || 'score'; if(lMetric==='h') lMetric='score';
+// cari il üzrə müəllim göstəriciləri
+function yStats(t){
+  const arts=(t.eids||[]).map(e=>D.articles[e]).filter(a=>a && a.year===D.this_year);
+  const q={Q1:0,Q2:0,Q3:0,Q4:0,none:0}; arts.forEach(a=>q[a['q_'+qMode]||'none']++);
+  return {n:arts.length, cit:arts.reduce((s,a)=>s+a.cited,0), q};
+}
+function metricVal(y){
+  if(lMetric==='arts') return y.n;
+  if(lMetric==='cit') return y.cit;
+  if(lMetric==='q12') return y.q.Q1+y.q.Q2;
+  return Object.keys(QW).reduce((s,k)=>s+y.q[k]*QW[k],0) + y.cit/10;
+}
+function metricFmt(v){ return lMetric==='score' ? v.toFixed(1) : fmt(v); }
+function leadersBlock(){
+  const ms=[['score',tr('mScore')],['arts',tr('mArts')],['cit',tr('mCit')],['q12','Q1+Q2']];
+  const cols = D.departments.map((d,i)=>{
+    const top = d.teachers.map((t,j)=>{ const y=yStats(t); return {...t,j,y,v:metricVal(y)}; }).filter(t=>t.scopus_id && t.y.n>0 && t.v>0)
+      .sort((a,b)=>b.v-a.v || b.y.n-a.y.n || b.y.cit-a.y.cit).slice(0,3);
+    const max = top.length ? top[0].v || 1 : 1;
+    const rows = top.map((t,k)=>`<a class="ld-row" href="#d=${i}&t=${t.j}" title="${tr('place',k+1)}">
+        <span class="medal m${k+1}" aria-label="${tr('place',k+1)}">${k+1}</span>
+        <span class="ld-main"><span class="ld-name">${esc(t.name)}</span>
+          <span class="ld-bar"><i style="width:${Math.max(6,100*t.v/max)}%"></i></span></span>
+        <span class="ld-val">${metricFmt(t.v)}</span></a>`).join('');
+    return `<div class="ld-col"><div class="ld-dept"><a href="#d=${i}">${esc(nm(d.name))}</a></div>${rows||`<div class="muted ld-empty">${tr('noLeaders',D.this_year)}</div>`}</div>`;
+  }).join('');
+  return `<div class="card leaders"><div class="head"><div><h3>${tr('leaders')} — ${D.this_year}</h3><div class="sub">${tr('leadersSub',D.this_year)}</div></div>
+      <div class="seg" id="lmetric">${ms.map(([k,l])=>`<button data-lm="${k}" class="${lMetric===k?'on':''}">${l}</button>`).join('')}</div></div>
+    <div class="ld-grid">${cols}</div>
+    <div class="ld-note">${lMetric==='score'?tr('scoreHelp', qMode==='sjr'?'SJR':'CiteScore', D.this_year):tr('yearNote',D.this_year)}</div></div>`;
+}
+
+// ---------------- faculty view
+function facultyView(){
+  const f = D.faculty;
+  const extra = kpi(tr('kWithId'), `${f.with_id} <small>/ ${f.teachers}</small>`, tr('teachersW'));
+  const rows = D.departments.map((d,i)=>{
+    const q=d[qMode];
+    return `<tr class="click" data-href="#d=${i}"><td><a href="#d=${i}">${esc(nm(d.name))}</a></td><td>${d.teachers.length}</td><td>${d.articles}</td><td>${fmt(d.citations)}</td>
+      <td>${q.Q1}</td><td>${q.Q2}</td><td>${q.Q3}</td><td>${q.Q4}</td>${yearCells(d.eids)}</tr>`;}).join('');
+  return `<div class="crumb">${esc(D.faculty_short)}</div>
+    <h2>${esc(LANG==='az'?D.faculty_name:tr('faculty'))}</h2>
+    <div class="sub">${tr('facSub',D.departments.length,f.teachers)}</div>
+    ${topBlock(f, f.by_year, extra)}
+    <div class="card"><h3>${tr('depts')}</h3><div class="sub">${tr('deptsSub')}</div>
+      <table class="gt">${groupHead(tr('thDept'),[[tr('thTeachers'),tr('thTeachersTitle')]])}<tbody>${rows}</tbody></table></div>
+    ${leadersBlock()}
+    ${statsBlock(Object.keys(D.articles))}
+    ${articleTable(Object.keys(D.articles), tr('allArts'))}`;
+}
+
+// ---------------- department view
+function deptView(i){
+  const d = D.departments[i]; if(!d) return facultyView();
+  const withId = d.teachers.filter(t=>t.scopus_id).length;
+  const extra = kpi(tr('kWithId'), `${withId} <small>/ ${d.teachers.length}</small>`, tr('teachersW'));
+  const ts = d.teachers.map((t,j)=>({...t,j})).sort((a,b)=>b.articles-a.articles);
+  const rows = ts.map(t=>{
+    const q=t[qMode];
+    if(!t.scopus_id) return `<tr><td>${esc(t.name)} <span class="muted">· ${esc(t.position)}</span><div class="warn">${tr('noId')}${t.raw_id?': '+esc(t.raw_id):''}</div></td><td colspan="10" class="muted" style="text-align:center">—</td></tr>`;
+    return `<tr class="click" data-href="#d=${i}&t=${t.j}"><td><a href="#d=${i}&t=${t.j}">${esc(t.name)}</a> <span class="muted">· ${esc(nm(t.position))}</span>${t.error?`<div class="warn">${esc(errTr(t.error))}</div>`:''}${t.warning?`<div class="warn">⚠ ${esc(warnTr(t.warning))}${tr('checkExcel')}</div>`:''}</td>
+      <td>${t.h_index??'—'}</td><td>${t.articles}</td><td>${fmt(t.citations)}</td><td>${q.Q1}</td><td>${q.Q2}</td><td>${q.Q3}</td><td>${q.Q4}</td>${yearCells(t.eids)}</tr>`;}).join('');
+  return `<div class="crumb"><a href="#">${esc(D.faculty_short)}</a> › ${esc(nm(d.name))}</div>
+    <h2>${esc(nm(d.name))}</h2><div class="sub">${tr('deptSub',d.teachers.length)}</div>
+    ${topBlock(d, d.by_year, extra)}
+    <div class="card"><h3>${tr('teachersT')}</h3><div class="sub">${tr('teachersSub')}</div>
+      <table class="gt">${groupHead(tr('thTeacher'),[['h-index',tr('hTitle')]])}<tbody>${rows}</tbody></table></div>
+    ${statsBlock(d.eids)}
+    ${articleTable(d.eids, tr('deptArts'))}`;
+}
+
+// ---------------- teacher view
+function teacherView(i,j){
+  const d=D.departments[i], t=d&&d.teachers[j]; if(!t) return deptView(i);
+  const extra = kpi('h-index', t.h_index??'—', 'Scopus ID: '+esc((t.scopus_ids&&t.scopus_ids.length?t.scopus_ids:[t.scopus_id]).join(', ')));
+  return `<div class="crumb"><a href="#">${esc(D.faculty_short)}</a> › <a href="#d=${i}">${esc(nm(d.name))}</a> › ${esc(t.name)}</div>
+    <h2>${esc(t.name)}</h2><div class="sub">${esc(nm(t.position))} · ${(t.scopus_ids&&t.scopus_ids.length?t.scopus_ids:[t.scopus_id]).map((id,k,arr)=>`<a href="https://www.scopus.com/authid/detail.uri?authorId=${esc(id)}" target="_blank" rel="noopener">${tr('profile')}${arr.length>1?' '+(k+1):''}</a>`).join(' · ')}${t.orcid?` · ORCID ${esc(t.orcid.replace(/.*(\d{4}-\d{4}-\d{4}-\d{3}[\dX]).*/,'$1'))}`:''}</div>
+    ${topBlock(t, byYearOf(t.eids), extra)}
+    ${statsBlock(t.eids)}
+    ${articleTable(t.eids, tr('arts'))}`;
+}
+
+function render(){
+  const h = new URLSearchParams(location.hash.slice(1));
+  const i = h.has('d') ? +h.get('d') : null, j = h.has('t') ? +h.get('t') : null;
+  const v = document.getElementById('view');
+  v.innerHTML = i==null ? facultyView() : j==null ? deptView(i) : teacherView(i,j);
+  v.querySelectorAll('.seg button[data-q]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.q==='sjr' && D.has_sjr===false){ sjrHelp(); return; }
+    qMode=b.dataset.q;localSet('qmode',qMode);render();});
+  v.querySelectorAll('#lmetric button').forEach(b=>b.onclick=()=>{lMetric=b.dataset.lm;localSet('lmetric',lMetric);render();});
+  v.querySelectorAll('tr.click').forEach(r=>r.onclick=e=>{ if(e.target.tagName!=='A') location.hash=r.dataset.href; });
+  wireArticles();
+}
+window.addEventListener('hashchange', ()=>{render();window.scrollTo(0,0);});
+applyMeta();
+render();
+function sjrHelp(){
+  const y=new Date().getFullYear(); let links='';
+  for(let k=1;k<=10;k++){ const yy=y-k; links+=`<a href="https://www.scimagojr.com/journalrank.php?year=${yy}&out=xls" target="_blank" rel="noopener">${yy}</a> `; }
+  showProgress(`${tr('sjrHelp')} <div style="margin-top:6px;line-height:2">${links}</div>
+    <span class="muted">${tr('sjrHelp2')}</span>`);
+}
+
+// ---------------- Təqvim: bir gün və ya aralıq
+// Gün   → həmin günə qədər dərc olunmuş məqalələr (o gün üçün saxlanmış yeniləmə varsa — həmin günün vəziyyəti)
+// Aralıq → iki tarix arasında dərc olunmuş məqalələr (+ saxlanmış yeniləmələr varsa istinad artımı)
+const cal = document.getElementById('cal'), cal2 = document.getElementById('cal2');
+let calMode = 'day';
+function today(){ return LATEST.updated.slice(0,10); }
+function snaps(){ const s=(LATEST.snapshots||[]).slice(); if(!s.includes(today())) s.push(today()); return s.sort(); }
+function setupCal(){
+  [cal,cal2].forEach(c=>{ c.removeAttribute('min'); c.max = today(); });
+  cal.value = today(); cal2.value = today();
+}
+function setMode(m){
+  calMode=m; document.querySelectorAll('#calmode button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  document.getElementById('cal2wrap').style.display = m==='range'?'':'none';
+}
+document.querySelectorAll('#calmode button').forEach(b=>b.onclick=()=>{
+  setMode(b.dataset.m);
+  if(b.dataset.m==='range'){ cal.value = today().slice(0,4)+'-01-01'; cal2.value = today(); }
+  else cal.value = today();
+  onCal();
+});
+const cache = {};
+async function getSnap(day){
+  if(day===today()) return LATEST;
+  if(cache[day]) return cache[day];
+  if(!location.protocol.startsWith('http')) throw new Error('file');
+  const r = await fetch('/api/snapshot?date='+day,{cache:'no-store'}); if(!r.ok) throw new Error('nf');
+  return cache[day] = await r.json();
+}
+function clearProg(){ const p=document.getElementById('prog'); if(p) p.remove(); }
+const fmtD = d => d.split('-').reverse().join('.');
+
+// məqalənin dərc tarixi: tam tarix, yoxdursa yalnız il
+function inRange(a, from, to){
+  if(a.date && a.date.length>=10) return (!from || a.date>=from) && a.date<=to;
+  if(!a.year) return false;
+  return (!from || a.year>=+from.slice(0,4)) && a.year<=+to.slice(0,4);
+}
+// LATEST-dən yalnız seçilmiş məqalələrlə statistikanı yenidən hesablayır
+function filtered(pred, label){
+  const C = JSON.parse(JSON.stringify(LATEST));
+  Object.keys(C.articles).forEach(e=>{ if(!pred(C.articles[e])) delete C.articles[e]; });
+  const ty=C.this_year;
+  const sum = (o, eids)=>{
+    const arts = eids.map(e=>C.articles[e]).filter(Boolean);
+    const q = k=>{ const c={Q1:0,Q2:0,Q3:0,Q4:0,none:0}; arts.forEach(a=>c[a[k]||'none']++); return c; };
+    o.eids = eids.filter(e=>C.articles[e]);
+    o.articles=arts.length; o.citations=arts.reduce((s,a)=>s+a.cited,0);
+    o.this_year=arts.filter(a=>a.year===ty).length; o.last_year=arts.filter(a=>a.year===ty-1).length;
+    o.sjr=q('q_sjr'); o.cs=q('q_cs'); o.new=arts.filter(a=>a.new).length;
+    o.by_year=C.years.map(y=>arts.filter(a=>a.year===y).length);
+  };
+  C.departments.forEach(d=>{ sum(d,d.eids); d.teachers.forEach(t=>sum(t,t.eids)); });
+  sum(C.faculty, Object.keys(C.articles));
+  delete C.faculty.delta_articles; delete C.faculty.delta_citations;
+  C.filterLabel = label; return C;
+}
+
+// seçim brauzerin yaddaşında qalır (yeniləmədən və brauzeri bağlayıb açandan sonra da)
+// aralığın sonu "bugün"dürsə, "bugün" kimi yadda saxlanır ki, sonrakı günlərdə də son tarix özü sürüşsün
+function saveSel(){ localSet('calsel', JSON.stringify({m:calMode,a:cal.value,b:(cal2.value>=today()?'today':cal2.value)})); }
+function clearSel(){ try{ localStorage.removeItem('calsel'); }catch(e){} }
+async function onCal(){
+  clearProg(); saveSel();
+  try{
+    if(calMode==='day'){
+      const day=cal.value; if(!day) return;
+      // həmişə ən son məlumat və cari müəllim siyahısı; yalnız dərc tarixinə görə süzülür
+      if(day>=today()){ D=LATEST; }
+      else D = filtered(a=>inRange(a,null,day), tr('fDay',fmtD(day)));
+    } else {
+      let a=cal.value, b=cal2.value; if(!a||!b) return; if(a>b){ [a,b]=[b,a]; cal.value=a; cal2.value=b; }
+      D = filtered(x=>inRange(x,a,b), tr('fRange',fmtD(a),fmtD(b)));
+      // saxlanmış yeniləmələr varsa — bu dövrdə Scopus-da əlavə olunan istinad/məqalə artımı
+      const sn = snaps(), sa = sn.filter(x=>x>=a && x<=b);
+      if(sa.length>=2){
+        try{ const [A,B]=await Promise.all([getSnap(sa[0]),getSnap(sa[sa.length-1])]);
+          D.growth = {from:sa[0], to:sa[sa.length-1], art:B.faculty.articles-A.faculty.articles, cit:B.faculty.citations-A.faculty.citations};
+        }catch(e){}
+      }
+    }
+    applyMeta(); render();
+  }catch(e){
+    showProgress(e.message==='file' ? tr('needServer') : tr('dayFail'));
+  }
+}
+cal.onchange = onCal; cal2.onchange = onCal;
+
+// ---------------- masaüstü tətbiq: Excel düyməsi (yalnız tətbiq pəncərəsində görünür)
+function enableDesktop(){ if(window.pywebview && window.pywebview.api && window.pywebview.api.open_excel){ const xb=document.getElementById('excelbtn'); xb.style.display=''; xb.onclick=()=>window.pywebview.api.open_excel(); } }
+window.addEventListener('pywebviewready', enableDesktop); enableDesktop();
+
+// ---------------- "Yenilə" düyməsi (yalnız server rejimində işləyir: yenile.command)
+const btn = document.getElementById('refresh');
+const served = location.protocol.startsWith('http');
+function showProgress(t){ let p=document.getElementById('prog'); if(!p){p=document.createElement('div');p.id='prog';p.className='progress';document.getElementById('banner').after(p);} p.innerHTML=t; }
+async function poll(){
+  try{
+    const st = await (await fetch('/api/status',{cache:'no-store'})).json();
+    if(st.running){ btn.disabled=true; btn.textContent=tr('refreshing'); showProgress(tr('updating')+esc(st.last||'')); setTimeout(poll,1500); return; }
+    if(st.error){ btn.disabled=false; btn.textContent=tr('refresh'); showProgress(tr('errL')+esc(st.error)); return; }
+    if(btn.disabled){ location.reload(); }
+  }catch(e){ btn.disabled=false; btn.textContent=tr('refresh'); showProgress(tr('closed')); }
+}
+btn.onclick = async ()=>{
+  if(!served){ showProgress(tr('fileOpen')); return; }
+  btn.disabled=true; btn.textContent=tr('refreshing');
+  try{ await fetch('/api/refresh',{method:'POST'}); }catch(e){}
+  poll();
+};
+if(served) poll();
+setupCal();
+// yeniləmədən (səhifə yenidən yüklənəndən) sonra təqvim seçimini bərpa et
+try{
+  if(localGet('calsel_v')!=='2'){ clearSel(); localSet('calsel_v','2'); }
+  const sel = JSON.parse(localGet('calsel')||'null');
+  if(sel && (sel.m==='range' || (sel.a && sel.a<today()))){
+    setMode(sel.m); cal.value=sel.a; cal2.value = (sel.m==='range' && sel.b && sel.b!=='today' && sel.b<today()) ? sel.b : today();
+    onCal();
+  }
+}catch(e){}
+// Səhifə açıq qalanda hər saat yenidən yüklənir (avtomatik yeniləmə olubsa, yeni rəqəmlər görünür)
+setInterval(()=>{ if(!btn.disabled) location.reload(); }, 60*60*1000);
+</script>
+</body>
+</html>

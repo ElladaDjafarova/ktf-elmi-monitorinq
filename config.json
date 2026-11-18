@@ -1,0 +1,14 @@
+{
+  "api_key": "6e9fa4cbd2bb25dd4185b35f40a2c0ed",
+  "insttoken": "",
+  "faculty_short": "KTF",
+  "faculty_name": "Kimya texnologiyaları fakültəsi",
+  "excel_file": "muellimler.xlsx",
+  "skip_sheets": [
+    "Dropdown options"
+  ],
+  "output_html": "dashboard.html",
+  "years_in_chart": 10,
+  "request_pause_sec": 0.2,
+  "university_name": "Azərbaycan Dövlət Neft və Sənaye Universiteti"
+}

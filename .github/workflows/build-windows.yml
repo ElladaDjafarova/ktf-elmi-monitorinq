@@ -1,0 +1,80 @@
+name: Windows quraşdırma faylı (.exe)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lazım olan fayllar yerindədirmi
+        shell: pwsh
+        run: |
+          $missing = @("muellimler.xlsx", "logo.ico", "logo.png") | Where-Object { -not (Test-Path $_) }
+          if ($missing) { throw "Bu fayllar repo-ya yüklənməyib: $($missing -join ', ')" }
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Kitabxanaları quraşdır
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Proqramı yığ (PyInstaller)
+        run: pyinstaller --noconfirm ElmiMonitorinq.spec
+
+      - name: Yoxla — proqram açılır və dashboard cavab verir
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\ElmiMonitorinq\ElmiMonitorinq.exe" -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 40; $i++) {
+            Start-Sleep -Seconds 2
+            try {
+              $r = Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8765/api/status" -TimeoutSec 3
+              if ($r.StatusCode -eq 200) { $ok = $true; break }
+            } catch {}
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          $log = Join-Path $env:APPDATA "KTF Elmi Monitorinq\data\log.txt"
+          if (Test-Path $log) { Get-Content $log -Tail 40 }
+          if (-not $ok) { throw "Proqram açılmadı — yuxarıdakı jurnala baxın" }
+          Write-Host "Proqram işləyir"
+
+      - name: Inno Setup quraşdır
+        run: choco install innosetup -y --no-progress
+
+      - name: Quraşdırma faylını yarat
+        shell: pwsh
+        run: |
+          # Inno Setup Azərbaycan hərfləri üçün UTF-8 BOM tələb edir
+          python -c "p='installer.iss';s=open(p,encoding='utf-8-sig').read();open(p,'w',encoding='utf-8-sig').write(s)"
+          $ver = "1.0.$env:GITHUB_RUN_NUMBER"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$ver" installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup xətası" }
+
+      - name: Faylı yüklə (Artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KTF_Elmi_Monitorinq_Setup
+          path: dist/KTF_Elmi_Monitorinq_Setup.exe
+
+      - name: Release — yükləmə linki
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Elmi Monitorinq 1.0.${{ github.run_number }}
+          body: |
+            Windows quraşdırma faylı. KTF_Elmi_Monitorinq_Setup.exe → Next → Install.
+            "Windows protected your PC" görünsə: More info → Run anyway.
+          files: dist/KTF_Elmi_Monitorinq_Setup.exe
+          make_latest: true
