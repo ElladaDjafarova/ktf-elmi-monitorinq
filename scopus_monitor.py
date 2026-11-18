@@ -292,6 +292,8 @@ def author_articles(api, sid):
                 "first_author": e.get("dc:creator") or "",
                 "authors": _authors(e),
                 "affils": _affils(e),
+                "abstract": e.get("dc:description") or "",
+                "keywords": e.get("authkeywords") or "",
                 "volume": e.get("prism:volume") or "",
                 "pages": e.get("prism:pageRange") or "",
             })
@@ -321,6 +323,7 @@ def db():
     CREATE TABLE IF NOT EXISTS journal_cs (issn TEXT PRIMARY KEY, json TEXT, fetched TEXT);
     CREATE TABLE IF NOT EXISTS seen (eid TEXT PRIMARY KEY, first_seen TEXT);
     CREATE TABLE IF NOT EXISTS runs (run_at TEXT PRIMARY KEY, summary TEXT);
+    CREATE TABLE IF NOT EXISTS abstracts (eid TEXT PRIMARY KEY, abstract TEXT, keywords TEXT, fetched TEXT);
     """)
     return con
 
@@ -599,7 +602,57 @@ def collect(cfg, depts):
         a["q_sjr"] = sj.quartile([a["issn"], a["eissn"]], a["year"] or dt.date.today().year)
         a["q_cs"] = nearest_year(cs_cache.get(issn, {}), a["year"]) if issn else None
     collect.has_sjr = sj.any_loaded
+    remember_abstracts(con, articles)
+    apply_sdg(articles)
     return articles, con
+
+
+def remember_abstracts(con, articles):
+    """Universitet şəbəkəsində alınan xülasə və açar sözləri saxla; evdən yeniləyəndə onları istifadə et."""
+    now = dt.datetime.now().isoformat()
+    new = [(e, a["abstract"], a.get("keywords") or "", now) for e, a in articles.items() if a.get("abstract")]
+    if new:
+        con.executemany("INSERT OR REPLACE INTO abstracts VALUES (?,?,?,?)", new)
+        con.commit()
+    missing = [e for e, a in articles.items() if not a.get("abstract")]
+    filled = 0
+    for i in range(0, len(missing), 500):
+        part = missing[i:i + 500]
+        q = "SELECT eid, abstract, keywords FROM abstracts WHERE eid IN (%s)" % ",".join("?" * len(part))
+        for eid, ab, kw in con.execute(q, part):
+            articles[eid]["abstract"] = ab
+            if not articles[eid].get("keywords"):
+                articles[eid]["keywords"] = kw
+            filled += 1
+    if filled:
+        log(f"  {filled} məqalənin xülasəsi əvvəlki (universitet) yeniləməsindən götürüldü")
+
+
+def sdg_query_file():
+    here = os.path.dirname(os.path.abspath(__file__))
+    for d in (globals().get("RES"), here, BASE):
+        if d and os.path.exists(os.path.join(d, "sdg_queries_2023.json.gz")):
+            return os.path.join(d, "sdg_queries_2023.json.gz")
+    return None
+
+
+def apply_sdg(articles):
+    """Elsevier 2023 SDG sorğularını başlıq, xülasə və açar sözlərə tətbiq edir."""
+    path = sdg_query_file()
+    apply_sdg.basis = None
+    if not path:
+        log("  SDG sorğu faylı tapılmadı — SDG hesablanmır")
+        return
+    try:
+        import sdg
+        res = sdg.classify(articles, path)
+        for eid, nums in res.items():
+            articles[eid]["sdg"] = nums
+        with_abs = sum(1 for a in articles.values() if a.get("abstract"))
+        apply_sdg.basis = "full" if with_abs > len(articles) * 0.5 else "title"
+        log(f"  SDG: {sum(1 for v in res.values() if v)} məqalə ({'başlıq+xülasə+açar söz' if apply_sdg.basis == 'full' else 'yalnız başlıq'})")
+    except Exception as e:
+        log(f"  SDG hesablanmadı: {e}")
 
 
 def demo_collect(depts):
@@ -639,6 +692,9 @@ def demo_collect(depts):
                 if eid not in t["eids"]:
                     t["eids"].append(eid)
             t["metrics"] = {"h_index": rnd.randint(1, 15), "citations": None, "documents": k}
+    for a in articles.values():
+        a["sdg"] = sorted(rnd.sample([6, 7, 9, 12, 13, 3, 14], rnd.choice([0, 0, 0, 1, 1, 2])))
+    apply_sdg.basis = "full"
     return articles, db_demo()
 
 
@@ -774,6 +830,7 @@ def build(cfg, depts, articles, con, demo=False):
         "updated": now.strftime("%Y-%m-%d %H:%M"),
         "demo": demo,
         "has_sjr": True if demo else getattr(collect, "has_sjr", True),
+        "sdg_basis": getattr(apply_sdg, "basis", None),
         "faculty_short": cfg["faculty_short"],
         "faculty_name": cfg["faculty_name"],
         "university": cfg.get("university_name", "Azərbaycan Dövlət Neft və Sənaye Universiteti"),
@@ -785,6 +842,7 @@ def build(cfg, depts, articles, con, demo=False):
                                                      "doi", "type", "volume", "pages")},
                              authors=[x["name"] for x in a.get("authors", [])],
                              **intl_info(a),
+                             sdg=a.get("sdg"),
                              ours=fac_authors.get(e, []),
                              new=e in new_set) for e, a in articles.items()},
     }
@@ -858,12 +916,13 @@ def export_articles(articles, fac_authors):
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f, delimiter=";")
         w.writerow(["Başlıq", "Müəlliflər", "Fakültə müəllimləri", "Jurnal", "İl", "Cild", "Səhifələr",
-                    "DOI", "Kvartil (SJR)", "Kvartil (CiteScore)", "İstinad", "Növ", "Scopus EID"])
+                    "DOI", "Kvartil (SJR)", "Kvartil (CiteScore)", "İstinad", "Növ", "Scopus EID", "SDG"])
         for a in rows:
             w.writerow([a["title"], "; ".join(x["name"] for x in a.get("authors", [])),
                         "; ".join(fac_authors.get(a["eid"], [])), a["journal"], a["year"] or "",
                         a.get("volume", ""), a.get("pages", ""), a["doi"], a.get("q_sjr") or "",
-                        a.get("q_cs") or "", a["cited"], a["type"], a["eid"]])
+                        a.get("q_cs") or "", a["cited"], a["type"], a["eid"],
+                        ", ".join(f"SDG {n}" for n in a.get("sdg") or [])])
 
 
 # ----------------------------------------------------------------- main
