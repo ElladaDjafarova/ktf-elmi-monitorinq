@@ -234,6 +234,26 @@ def _search(api, sid, start):
     return api.get("/search/scopus", params)
 
 
+def _afids(v):
+    if not v:
+        return []
+    if isinstance(v, dict):
+        v = [v]
+    return [str(x.get("$") if isinstance(x, dict) else x) for x in v if x]
+
+
+def _affils(e):
+    """Məqalənin təşkilatları: [{id, name, city, country}] (STANDARD görünüşündə də gəlir)."""
+    out = []
+    af = e.get("affiliation") or []
+    if isinstance(af, dict):
+        af = [af]
+    for a in af:
+        out.append({"id": str(a.get("afid") or ""), "name": a.get("affilname") or "",
+                    "city": a.get("affiliation-city") or "", "country": a.get("affiliation-country") or ""})
+    return out
+
+
 def _authors(e):
     out = []
     au = e.get("author") or []
@@ -242,7 +262,7 @@ def _authors(e):
     for a in au:
         name = a.get("authname") or " ".join(x for x in (a.get("surname"), a.get("given-name")) if x)
         if name:
-            out.append({"name": name, "id": str(a.get("authid") or "")})
+            out.append({"name": name, "id": str(a.get("authid") or ""), "afids": _afids(a.get("afid"))})
     if not out and e.get("dc:creator"):
         out.append({"name": e["dc:creator"], "id": ""})
     return out
@@ -271,6 +291,7 @@ def author_articles(api, sid):
                 "doi": e.get("prism:doi") or "",
                 "first_author": e.get("dc:creator") or "",
                 "authors": _authors(e),
+                "affils": _affils(e),
                 "volume": e.get("prism:volume") or "",
                 "pages": e.get("prism:pageRange") or "",
             })
@@ -610,6 +631,9 @@ def demo_collect(depts):
                                      "first_author": t["name"].split()[0],
                                      "authors": [{"name": t["name"], "id": t["scopus_id"]}] + [{"name": rnd.choice(["Aliyev R.", "Mammadova S.", "Huseynov T.", "Ivanov A.", "Smith J."]), "id": ""} for _ in range(rnd.randint(1, 4))],
                                      "volume": str(rnd.randint(1, 300)), "pages": "",
+                                     "affils": [{"id": "1", "name": "Azerbaijan State Oil and Industry University", "city": "Baku", "country": "Azerbaijan"}]
+                                               + ([{"id": "2", "name": rnd.choice(["Kazan Federal University", "Istanbul Technical University", "University of Tehran", "Tsinghua University", "Gubkin University"]),
+                                                    "city": "", "country": rnd.choice(["Russian Federation", "Turkey", "Iran", "China", "Russian Federation"])}] if rnd.random() < 0.35 else []),
                                      "q_sjr": q, "q_cs": q if rnd.random() < .7 else rnd.choice(["Q1", "Q2", "Q3", None])}
                     pool.append(eid)
                 if eid not in t["eids"]:
@@ -636,6 +660,24 @@ def qcounts(arts, key):
 def h_index(cites):
     cites = sorted(cites, reverse=True)
     return sum(1 for i, c in enumerate(cites, 1) if c >= i)
+
+
+HOME_COUNTRY = "Azerbaijan"
+
+
+def intl_info(a):
+    """Xarici həmmüəlliflik: xarici təşkilatlar, ölkələr və (məlumdursa) xarici müəlliflər."""
+    affs = a.get("affils") or []
+    foreign = [x for x in affs if x.get("country") and x["country"].strip().lower() != HOME_COUNTRY.lower()]
+    fids = {x["id"] for x in foreign if x.get("id")}
+    # müəllifin təşkilatlarından biri xaricidirsə — xarici müəllif (yalnız tam müəllif siyahısı gələndə)
+    fau = [au["name"] for au in a.get("authors", []) if fids & set(au.get("afids") or [])]
+    return {
+        "intl": bool(foreign),
+        "countries": sorted({x["country"] for x in foreign}),
+        "forg": [[x["name"], x["country"]] for x in foreign],
+        "fau": fau,
+    }
 
 
 def summarize(arts, new_set, this_year):
@@ -742,6 +784,7 @@ def build(cfg, depts, articles, con, demo=False):
         "articles": {e: dict({k: a.get(k) for k in ("title", "journal", "year", "date", "cited", "q_sjr", "q_cs",
                                                      "doi", "type", "volume", "pages")},
                              authors=[x["name"] for x in a.get("authors", [])],
+                             **intl_info(a),
                              ours=fac_authors.get(e, []),
                              new=e in new_set) for e, a in articles.items()},
     }
