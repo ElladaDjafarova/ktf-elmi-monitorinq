@@ -334,6 +334,8 @@ def db():
     CREATE TABLE IF NOT EXISTS seen (eid TEXT PRIMARY KEY, first_seen TEXT);
     CREATE TABLE IF NOT EXISTS runs (run_at TEXT PRIMARY KEY, summary TEXT);
     CREATE TABLE IF NOT EXISTS abstracts (eid TEXT PRIMARY KEY, abstract TEXT, keywords TEXT, fetched TEXT);
+    CREATE TABLE IF NOT EXISTS cit_ext (sids TEXT, eid TEXT, year INTEGER, cy INTEGER, n INTEGER, fetched TEXT,
+                                        PRIMARY KEY (sids, eid, year));
     CREATE TABLE IF NOT EXISTS cit_year (eid TEXT, year INTEGER, cited INTEGER, n INTEGER, fetched TEXT,
                                          PRIMARY KEY (eid, year));
     """)
@@ -589,6 +591,7 @@ def collect(cfg, depts):
                     t["eids"].append(a["eid"])
 
     citations_this_year(api, con, articles)
+    external_this_year(api, con, teachers, articles)
 
     # 3) jurnal kvartilləri — CiteScore 30 gün keşlənir, qalanı paralel
     log(f"{len(articles)} unikal məqalə · jurnal kvartilləri hesablanır...")
@@ -642,47 +645,6 @@ def _citation_overview(api, eids, year):
     return out
 
 
-def _openalex_year_share(arts, year):
-    """OpenAlex-dən DOI üzrə illik istinad payı; Scopus istinad sayına miqyaslanır. {eid: təxmini say}"""
-    from concurrent.futures import ThreadPoolExecutor
-    by_doi = {}
-    for a in arts:
-        d = (a.get("doi") or "").strip().lower()
-        if d:
-            by_doi.setdefault(d, []).append(a)
-    dois = list(by_doi)
-    batches = [dois[i:i + 40] for i in range(0, len(dois), 40)]
-
-    def one(batch):
-        url = ("https://api.openalex.org/works?per-page=50&select=doi,cited_by_count,counts_by_year"
-               "&mailto=ktf-monitor@asoiu.edu.az&filter=doi:" + urllib.parse.quote("|".join(batch), safe="|/:"))
-        for attempt in range(3):
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
-                with urllib.request.urlopen(req, timeout=40) as r:
-                    return json.loads(r.read().decode("utf-8")).get("results") or []
-            except Exception:
-                time.sleep(2 * (attempt + 1))
-        return None
-
-    out, failed = {}, 0
-    with ThreadPoolExecutor(WORKERS) as ex:
-        for res in ex.map(one, batches):
-            if res is None:
-                failed += 1
-                continue
-            for w in res:
-                d = (w.get("doi") or "").replace("https://doi.org/", "").lower()
-                tot = w.get("cited_by_count") or 0
-                y = sum(c.get("cited_by_count") or 0 for c in w.get("counts_by_year") or [] if c.get("year") == year)
-                for a in by_doi.get(d, []):
-                    sc = a.get("cited") or 0
-                    out[a["eid"]] = round(min(sc, sc * y / tot), 2) if tot else 0
-    if failed:
-        log(f"  OpenAlex: {failed} sorğu alınmadı")
-    return out
-
-
 def _refeid_count(api, eid, year):
     r = api.get("/search/scopus", {"query": f"REFEID({eid}) AND PUBYEAR IS {year}", "count": 1, "field": "eid"})
     return _int(((r or {}).get("search-results") or {}).get("opensearch:totalResults")) or 0
@@ -724,15 +686,7 @@ def citations_this_year(api, con, articles, year=None):
         except (AuthError, RuntimeError) as e:
             log(f"  REFEID axtarışı əlçatan deyil ({str(e)[:80]})")
     if method is None:
-        need = [a for a in todo if a.get("cy") is None]
-        est = _openalex_year_share(need, year) if need else {}
-        base = [a for a in need if a["eid"] in est]
-        share = (sum(est[a["eid"]] for a in base) / max(1, sum(a["cited"] for a in base))) if base else 0
-        for a in need:
-            a["cy"] = est[a["eid"]] if a["eid"] in est else round(a["cited"] * share, 2)
-            a["cyx"] = 1
-        log(f"  Scopus-un dəqiq sayı yalnız universitet şəbəkəsində alınır. {len(est)}/{len(need)} məqalə üçün "
-            f"OpenAlex illik payı ilə təxmini hesablandı.")
+        log("  Bu il alınan istinadları Scopus yalnız universitet şəbəkəsində verir; əvvəlki saylar saxlanıldı.")
         return
 
     def one_batch(batch):
@@ -759,6 +713,76 @@ def citations_this_year(api, con, articles, year=None):
             con.execute("INSERT OR REPLACE INTO cit_year VALUES (?,?,?,?,?)", (a["eid"], year, a["cited"], a["cy"], now))
     con.commit()
     log(f"  {sum(1 for a in todo if a['eid'] in got)}/{len(todo)} məqalənin {year} istinadı alındı ({method})")
+
+
+def external_this_year(api, con, teachers, articles, year=None):
+    """Müəllimin özünə istinadları çıxmaqla bu il alınan istinadlar:
+    REFEID(məqalə) AND PUBYEAR IS il AND NOT AU-ID(müəllim) — Scopus-un "Exclude self citations of selected author"."""
+    from concurrent.futures import ThreadPoolExecutor
+    year = year or dt.date.today().year
+    jobs, ok = [], [True]
+    for t in teachers:
+        t["cy_ext"] = None
+        sids = sorted(set(t.get("scopus_ids") or []))
+        if not sids:
+            continue
+        key = ",".join(sids)
+        t["_ext"] = {}
+        for e in t["eids"]:
+            a = articles.get(e)
+            if not a:
+                continue
+            cy = a.get("cy")
+            if cy is None:
+                t["_ext"] = None
+                break
+            if cy == 0:
+                t["_ext"][e] = 0
+                continue
+            row = con.execute("SELECT cy, n FROM cit_ext WHERE sids=? AND eid=? AND year=?", (key, e, year)).fetchone()
+            if row and row[0] == cy:
+                t["_ext"][e] = row[1]
+            else:
+                jobs.append((t, key, sids, e, cy))
+    if jobs:
+        t0, key0, sids0, e0, cy0 = jobs[0]
+        try:
+            _ext_count(api, e0, sids0, year)
+        except (AuthError, RuntimeError):
+            ok[0] = False
+            log("  Kənar istinadlar (özünə istinad çıxılmaqla) yalnız universitet şəbəkəsində alınır.")
+    if jobs and ok[0]:
+        log(f"  Kənar istinadlar: {len(jobs)} müəllim-məqalə cütü Scopus-dan soruşulur...")
+
+        def one(job):
+            t, key, sids, e, cy = job
+            try:
+                return job, _ext_count(api, e, sids, year)
+            except (AuthError, RuntimeError):
+                return job, None
+
+        now = dt.datetime.now().isoformat()
+        with ThreadPoolExecutor(WORKERS) as ex:
+            for (t, key, sids, e, cy), n in ex.map(one, jobs):
+                if n is None or t.get("_ext") is None:
+                    if t.get("_ext") is not None:
+                        t["_ext"] = None
+                    continue
+                t["_ext"][e] = n
+                con.execute("INSERT OR REPLACE INTO cit_ext VALUES (?,?,?,?,?,?)", (key, e, year, cy, n, now))
+        con.commit()
+    pending = {id(j[0]) for j in jobs} if not ok[0] else set()
+    for t in teachers:
+        ext = t.pop("_ext", None)
+        if ext is not None and id(t) not in pending and len(ext) == sum(1 for e in t["eids"] if e in articles):
+            t["cy_ext"] = sum(ext.values())
+
+
+def _ext_count(api, eid, sids, year):
+    au = " OR ".join(sids)
+    r = api.get("/search/scopus", {"query": f"REFEID({eid}) AND PUBYEAR IS {year} AND NOT AU-ID({au})",
+                                   "count": 1, "field": "eid"})
+    return _int(((r or {}).get("search-results") or {}).get("opensearch:totalResults")) or 0
 
 
 def remember_abstracts(con, articles):
@@ -848,6 +872,9 @@ def demo_collect(depts):
             t["metrics"] = {"h_index": rnd.randint(1, 15), "citations": None, "documents": k}
     for a in articles.values():
         a["sdg"] = sorted(rnd.sample([6, 7, 9, 12, 13, 3, 14], rnd.choice([0, 0, 0, 1, 1, 2])))
+    for d in depts:
+        for t in d["teachers"]:
+            t["cy_ext"] = sum(int((articles[e].get("cy") or 0) * .6) for e in t["eids"])
     apply_sdg.basis = "full"
     return articles, db_demo()
 
@@ -949,7 +976,7 @@ def build(cfg, depts, articles, con, demo=False):
                 "raw_id": t["raw_id"], "orcid": t["orcid"], "error": t.get("error"),
                 "h_index": (t.get("metrics") or {}).get("h_index") if (t.get("metrics") or {}).get("h_index") is not None
                            else (h_index([a["cited"] for a in ta]) if ta else None),
-                "eids": t["eids"], **s,
+                "eids": t["eids"], "cy_ext": t.get("cy_ext"), **s,
                 "warning": "; ".join(f"Scopus ID {sid} başqa müəllimdə də yazılıb: " + ", ".join(sorted(owners[sid] - {t['name']}))
                                      for sid in (t.get("scopus_ids") or []) if len(owners.get(sid, ())) > 1) or None,
             })
@@ -992,7 +1019,7 @@ def build(cfg, depts, articles, con, demo=False):
         "this_year": this_year,
         "faculty": fac,
         "departments": out_depts,
-        "articles": {e: dict({k: a.get(k) for k in ("title", "journal", "year", "date", "cited", "cy", "cyx", "q_sjr", "q_cs",
+        "articles": {e: dict({k: a.get(k) for k in ("title", "journal", "year", "date", "cited", "cy", "q_sjr", "q_cs",
                                                      "doi", "type", "volume", "pages")},
                              authors=[x["name"] for x in a.get("authors", [])],
                              **intl_info(a),
@@ -1073,12 +1100,17 @@ def export_csv(depts, articles):
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f, delimiter=";")
         w.writerow(["Kafedra", "Müəllim", "Vəzifə", "Scopus ID", "h-index", "Məqalə", "İstinad",
-                    "Q1 (SJR)", "Q2 (SJR)", "Q3 (SJR)", "Q4 (SJR)", "Kvartilsiz", "Bu il", "Yeni", "Qeyd"])
+                    "Q1 (SJR)", "Q2 (SJR)", "Q3 (SJR)", "Q4 (SJR)", "Kvartilsiz", "Bu il", "Yeni",
+                    "Bu il alınan istinad", "Kənardan (bu il)", "Özünə istinad (bu il)", "Qeyd"])
         for d in depts:
             for t in d["teachers"]:
+                cys = [articles[e].get("cy") for e in t["eids"] if e in articles]
+                cy = "" if any(c is None for c in cys) else sum(cys)
+                ext = t.get("cy_ext")
+                ext_s, self_s = ("", "") if ext is None or cy == "" else (ext, max(0, cy - ext))
                 w.writerow([d["name"], t["name"], t["position"], ", ".join(t.get("scopus_ids") or []), t["h_index"] or "",
                             t["articles"], t["citations"], t["sjr"]["Q1"], t["sjr"]["Q2"], t["sjr"]["Q3"],
-                            t["sjr"]["Q4"], t["sjr"]["none"], t["this_year"], t["new"],
+                            t["sjr"]["Q4"], t["sjr"]["none"], t["this_year"], t["new"], cy, ext_s, self_s,
                             t["error"] or ("Scopus ID yoxdur" if not t["scopus_id"] else "")])
 
 
