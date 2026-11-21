@@ -107,6 +107,8 @@ def _clean(v):
 # Excel vərəq adı 31 simvoldan uzun ola bilmir — dashboard-da göstəriləcək tam adlar
 DEPT_DISPLAY_NAMES = {
     "Proseslərin Təhlükəsizliyi": "Proseslərin Təhlükəsizliyi Mühəndisliyi",
+    "Biotexnologiya və qida müh.": "Biotexnologiya və qida mühəndisliyi",
+    "Proses təhlükəsizliyi müh.": "Proseslərin Təhlükəsizliyi Mühəndisliyi",
 }
 
 
