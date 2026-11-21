@@ -334,6 +334,8 @@ def db():
     CREATE TABLE IF NOT EXISTS seen (eid TEXT PRIMARY KEY, first_seen TEXT);
     CREATE TABLE IF NOT EXISTS runs (run_at TEXT PRIMARY KEY, summary TEXT);
     CREATE TABLE IF NOT EXISTS abstracts (eid TEXT PRIMARY KEY, abstract TEXT, keywords TEXT, fetched TEXT);
+    CREATE TABLE IF NOT EXISTS cit_year (eid TEXT, year INTEGER, cited INTEGER, n INTEGER, fetched TEXT,
+                                         PRIMARY KEY (eid, year));
     """)
     return con
 
@@ -586,6 +588,8 @@ def collect(cfg, depts):
                 if a["eid"] not in t["eids"]:
                     t["eids"].append(a["eid"])
 
+    citations_this_year(api, con, articles)
+
     # 3) jurnal kvartilləri — CiteScore 30 gün keşlənir, qalanı paralel
     log(f"{len(articles)} unikal məqalə · jurnal kvartilləri hesablanır...")
     issns = sorted({a["issn"] or a["eissn"] for a in articles.values() if a["issn"] or a["eissn"]})
@@ -615,6 +619,57 @@ def collect(cfg, depts):
     remember_abstracts(con, articles)
     apply_sdg(articles)
     return articles, con
+
+
+def citations_this_year(api, con, articles, year=None):
+    """Hər məqalə üçün bu il dərc olunmuş istinad edən sənədlərin sayı (Scopus qrafikindəki "Citations").
+    Ümumi istinad sayı dəyişməyibsə, keşdəki say götürülür."""
+    from concurrent.futures import ThreadPoolExecutor
+    year = year or dt.date.today().year
+    todo = []
+    for a in articles.values():
+        cited = a.get("cited") or 0
+        if not cited:
+            a["cy"] = 0
+            continue
+        row = con.execute("SELECT cited, n, fetched FROM cit_year WHERE eid=? AND year=?", (a["eid"], year)).fetchone()
+        if row and row[0] == cited and (dt.datetime.now() - dt.datetime.fromisoformat(row[2])).days < 30:
+            a["cy"] = row[1]
+        else:
+            todo.append(a)
+    if not todo:
+        return
+    log(f"{year}-ci il istinadları: {len(todo)} məqalə Scopus-dan soruşulur...")
+    denied = [False]
+    done = [0]
+
+    def one(a):
+        if denied[0]:
+            return a, None
+        try:
+            r = api.get("/search/scopus", {"query": f"REFEID({a['eid']}) AND PUBYEAR IS {year}", "count": 1, "field": "eid"})
+            n = _int(((r or {}).get("search-results") or {}).get("opensearch:totalResults"))
+        except AuthError:
+            denied[0] = True
+            return a, None
+        except RuntimeError as e:
+            log(f"  {a['eid']}: {e}")
+            return a, None
+        done[0] += 1
+        if done[0] % 50 == 0:
+            log(f"  istinadlar: {done[0]}/{len(todo)}")
+        return a, n
+
+    with ThreadPoolExecutor(WORKERS) as ex:
+        for a, n in ex.map(one, todo):
+            if n is None:
+                row = con.execute("SELECT n FROM cit_year WHERE eid=? AND year=?", (a["eid"], year)).fetchone()
+                a["cy"] = row[0] if row else None
+                continue
+            a["cy"] = n
+            con.execute("INSERT OR REPLACE INTO cit_year VALUES (?,?,?,?,?)",
+                        (a["eid"], year, a["cited"], n, dt.datetime.now().isoformat()))
+    con.commit()
 
 
 def remember_abstracts(con, articles):
@@ -690,7 +745,7 @@ def demo_collect(depts):
                     q = rnd.choice(["Q1", "Q2", "Q2", "Q3", "Q4", None])
                     articles[eid] = {"eid": eid, "title": f"Nümunə məqalə #{n}", "journal": j[0],
                                      "issn": j[1], "eissn": "", "year": (yy := rnd.randint(this - 10, this)), "date": f"{yy}-{rnd.randint(1, 12 if yy < this else 11):02d}-{rnd.randint(1, 28):02d}",
-                                     "cited": rnd.randint(0, 40), "type": "Article", "doi": f"10.0000/demo.{n}",
+                                     "cited": rnd.randint(0, 40), "cy": rnd.randint(0, 6), "type": "Article", "doi": f"10.0000/demo.{n}",
                                      "first_author": t["name"].split()[0],
                                      "authors": [{"name": t["name"], "id": t["scopus_id"]}] + [{"name": rnd.choice(["Aliyev R.", "Mammadova S.", "Huseynov T.", "Ivanov A.", "Smith J."]), "id": ""} for _ in range(rnd.randint(1, 4))],
                                      "volume": str(rnd.randint(1, 300)), "pages": "",
@@ -848,7 +903,7 @@ def build(cfg, depts, articles, con, demo=False):
         "this_year": this_year,
         "faculty": fac,
         "departments": out_depts,
-        "articles": {e: dict({k: a.get(k) for k in ("title", "journal", "year", "date", "cited", "q_sjr", "q_cs",
+        "articles": {e: dict({k: a.get(k) for k in ("title", "journal", "year", "date", "cited", "cy", "q_sjr", "q_cs",
                                                      "doi", "type", "volume", "pages")},
                              authors=[x["name"] for x in a.get("authors", [])],
                              **intl_info(a),
