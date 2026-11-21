@@ -104,6 +104,12 @@ def _clean(v):
     return re.sub(r"\s+", " ", str(v)).strip() if v not in (None, "") else ""
 
 
+# Excel vərəq adı 31 simvoldan uzun ola bilmir — dashboard-da göstəriləcək tam adlar
+DEPT_DISPLAY_NAMES = {
+    "Proseslərin Təhlükəsizliyi": "Proseslərin Təhlükəsizliyi Mühəndisliyi",
+}
+
+
 def read_teachers(cfg):
     """Hər vərəq = kafedra. Sütunlar: Ad, Vəzifə, Scopus ID (bir neçə ola bilər), WoS, ORCID, Qeyd."""
     path = cfg["excel_file"]
@@ -144,7 +150,9 @@ def read_teachers(cfg):
             }
             seen[key] = t
             teachers.append(t)
-        depts.append({"name": ws.title.strip(), "teachers": teachers})
+        title = ws.title.strip()
+        names = dict(DEPT_DISPLAY_NAMES, **(cfg.get("department_names") or {}))
+        depts.append({"name": names.get(title, title), "teachers": teachers})
     return depts
 
 
