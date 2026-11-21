@@ -621,9 +621,35 @@ def collect(cfg, depts):
     return articles, con
 
 
+def _citation_overview(api, eids, year):
+    """Citation Overview API: 25 məqaləyə qədər, illər üzrə istinad sayı. {eid: n}"""
+    ids = [e.replace("2-s2.0-", "") for e in eids]
+    r = api.get("/abstract/citations", {"scopus_id": ",".join(ids), "date": f"{year}-{year}"})
+    out = {}
+    m = ((r or {}).get("abstract-citations-response") or {}).get("citeInfoMatrix") or {}
+    m = (m.get("citeInfoMatrixXML") or {}).get("citationMatrix") or {}
+    infos = m.get("citeInfo") or []
+    if isinstance(infos, dict):
+        infos = [infos]
+    for ci in infos:
+        sid = str(ci.get("dc:identifier") or "").replace("SCOPUS_ID:", "")
+        cc = ci.get("cc") or []
+        if isinstance(cc, dict):
+            cc = [cc]
+        n = sum(_int(c.get("$")) or 0 for c in cc if isinstance(c, dict))
+        if sid:
+            out["2-s2.0-" + sid] = n
+    return out
+
+
+def _refeid_count(api, eid, year):
+    r = api.get("/search/scopus", {"query": f"REFEID({eid}) AND PUBYEAR IS {year}", "count": 1, "field": "eid"})
+    return _int(((r or {}).get("search-results") or {}).get("opensearch:totalResults")) or 0
+
+
 def citations_this_year(api, con, articles, year=None):
     """Hər məqalə üçün bu il dərc olunmuş istinad edən sənədlərin sayı (Scopus qrafikindəki "Citations").
-    Ümumi istinad sayı dəyişməyibsə, keşdəki say götürülür."""
+    Ümumi istinad sayı dəyişməyibsə keşdəki say götürülür. Scopus icazə verməsə, keşdəki son say qalır."""
     from concurrent.futures import ThreadPoolExecutor
     year = year or dt.date.today().year
     todo = []
@@ -636,40 +662,54 @@ def citations_this_year(api, con, articles, year=None):
         if row and row[0] == cited and (dt.datetime.now() - dt.datetime.fromisoformat(row[2])).days < 30:
             a["cy"] = row[1]
         else:
+            a["cy"] = row[1] if row else None
             todo.append(a)
     if not todo:
         return
     log(f"{year}-ci il istinadları: {len(todo)} məqalə Scopus-dan soruşulur...")
-    denied = [False]
-    done = [0]
+    got = {}
 
-    def one(a):
-        if denied[0]:
-            return a, None
+    batches = [todo[i:i + 25] for i in range(0, len(todo), 25)]
+    method = None
+    try:
+        got.update(_citation_overview(api, [a["eid"] for a in batches[0]], year))
+        method = "overview"
+    except (AuthError, RuntimeError) as e:
+        log(f"  Citation Overview API əlçatan deyil ({str(e)[:80]})")
+    if method is None:
         try:
-            r = api.get("/search/scopus", {"query": f"REFEID({a['eid']}) AND PUBYEAR IS {year}", "count": 1, "field": "eid"})
-            n = _int(((r or {}).get("search-results") or {}).get("opensearch:totalResults"))
-        except AuthError:
-            denied[0] = True
-            return a, None
-        except RuntimeError as e:
-            log(f"  {a['eid']}: {e}")
-            return a, None
-        done[0] += 1
-        if done[0] % 50 == 0:
-            log(f"  istinadlar: {done[0]}/{len(todo)}")
-        return a, n
+            got[todo[0]["eid"]] = _refeid_count(api, todo[0]["eid"], year)
+            method = "refeid"
+        except (AuthError, RuntimeError) as e:
+            log(f"  REFEID axtarışı əlçatan deyil ({str(e)[:80]})")
+    if method is None:
+        log("  Bu il alınan istinadlar yalnız universitet şəbəkəsində yenilənir; əvvəlki saylar saxlanıldı.")
+        return
+
+    def one_batch(batch):
+        try:
+            return _citation_overview(api, [a["eid"] for a in batch], year)
+        except (AuthError, RuntimeError) as e:
+            log(f"  {str(e)[:120]}")
+            return {}
+
+    def one_ref(a):
+        try:
+            return {a["eid"]: _refeid_count(api, a["eid"], year)}
+        except (AuthError, RuntimeError):
+            return {}
 
     with ThreadPoolExecutor(WORKERS) as ex:
-        for a, n in ex.map(one, todo):
-            if n is None:
-                row = con.execute("SELECT n FROM cit_year WHERE eid=? AND year=?", (a["eid"], year)).fetchone()
-                a["cy"] = row[0] if row else None
-                continue
-            a["cy"] = n
-            con.execute("INSERT OR REPLACE INTO cit_year VALUES (?,?,?,?,?)",
-                        (a["eid"], year, a["cited"], n, dt.datetime.now().isoformat()))
+        parts = ex.map(one_batch, batches[1:]) if method == "overview" else ex.map(one_ref, todo[1:])
+        for part in parts:
+            got.update(part)
+    now = dt.datetime.now().isoformat()
+    for a in todo:
+        if a["eid"] in got:
+            a["cy"] = got[a["eid"]]
+            con.execute("INSERT OR REPLACE INTO cit_year VALUES (?,?,?,?,?)", (a["eid"], year, a["cited"], a["cy"], now))
     con.commit()
+    log(f"  {sum(1 for a in todo if a['eid'] in got)}/{len(todo)} məqalənin {year} istinadı alındı ({method})")
 
 
 def remember_abstracts(con, articles):
