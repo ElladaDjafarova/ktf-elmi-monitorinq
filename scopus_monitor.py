@@ -884,14 +884,31 @@ def write_html(cfg, payload, demo=False):
     return out_path
 
 
+OLD_DEPT_NAMES = {
+    "Proses təhlükəsizliyi müh.": "Proseslərin Təhlükəsizliyi Mühəndisliyi",
+    "Proseslərin Təhlükəsizliyi": "Proseslərin Təhlükəsizliyi Mühəndisliyi",
+}
+
+
+def load_snapshot(fp):
+    with open(fp, encoding="utf-8") as f:
+        payload = json.load(f)
+    names = dict(OLD_DEPT_NAMES, **DEPT_DISPLAY_NAMES)
+    for d in payload.get("departments") or []:
+        d["name"] = names.get(d.get("name"), d.get("name"))
+    txt = json.dumps(payload, ensure_ascii=False)
+    for old, new in names.items():
+        txt = txt.replace(json.dumps(old, ensure_ascii=False), json.dumps(new, ensure_ascii=False))
+    return json.loads(txt)
+
+
 def rerender_latest(cfg, demo=False):
     """Scopus-a müraciət etmədən son saxlanmış günün məlumatını cari şablonla yenidən qurur."""
     snaps = list_snapshots(demo)
     if not snaps:
         return False
     d = os.path.join(DATA, "snapshots" if not demo else "snapshots_demo")
-    with open(os.path.join(d, snaps[-1] + ".json"), encoding="utf-8") as f:
-        payload = json.load(f)
+    payload = load_snapshot(os.path.join(d, snaps[-1] + ".json"))
     payload["snapshots"] = snaps
     write_html(cfg, payload, demo)
     return True
@@ -1046,8 +1063,7 @@ def serve(args, port, background=False):
                 fp = os.path.join(DATA, "snapshots" if not args.demo else "snapshots_demo", day + ".json")
                 if not os.path.exists(fp):
                     return self._json({"error": "bu gün üçün məlumat yoxdur"}, 404)
-                with open(fp, encoding="utf-8") as f:
-                    snap = json.load(f)
+                snap = load_snapshot(fp)
                 snap["snapshots"] = list_snapshots(args.demo)
                 return self._json(snap)
             if self.path.split("?")[0] in ("/", "/index.html"):
