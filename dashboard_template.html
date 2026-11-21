@@ -289,7 +289,7 @@ function quartCard(q, total){
 
 function curCit(s){
   const arts=(s.eids||Object.keys(D.articles)).map(e=>D.articles[e]).filter(Boolean);
-  if(arts.length && !arts.some(a=>a.cy!==undefined && a.cy!==null)) return '—';
+  if(arts.some(a=>a.cited>0 && (a.cy===undefined || a.cy===null))) return '—';
   return fmt(arts.reduce((x,a)=>x+(a.cy||0),0));
 }
 function topBlock(s, byYear, extraKpi){
