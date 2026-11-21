@@ -642,6 +642,47 @@ def _citation_overview(api, eids, year):
     return out
 
 
+def _openalex_year_share(arts, year):
+    """OpenAlex-dən DOI üzrə illik istinad payı; Scopus istinad sayına miqyaslanır. {eid: təxmini say}"""
+    from concurrent.futures import ThreadPoolExecutor
+    by_doi = {}
+    for a in arts:
+        d = (a.get("doi") or "").strip().lower()
+        if d:
+            by_doi.setdefault(d, []).append(a)
+    dois = list(by_doi)
+    batches = [dois[i:i + 40] for i in range(0, len(dois), 40)]
+
+    def one(batch):
+        url = ("https://api.openalex.org/works?per-page=50&select=doi,cited_by_count,counts_by_year"
+               "&mailto=ktf-monitor@asoiu.edu.az&filter=doi:" + urllib.parse.quote("|".join(batch), safe="|/:"))
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=40) as r:
+                    return json.loads(r.read().decode("utf-8")).get("results") or []
+            except Exception:
+                time.sleep(2 * (attempt + 1))
+        return None
+
+    out, failed = {}, 0
+    with ThreadPoolExecutor(WORKERS) as ex:
+        for res in ex.map(one, batches):
+            if res is None:
+                failed += 1
+                continue
+            for w in res:
+                d = (w.get("doi") or "").replace("https://doi.org/", "").lower()
+                tot = w.get("cited_by_count") or 0
+                y = sum(c.get("cited_by_count") or 0 for c in w.get("counts_by_year") or [] if c.get("year") == year)
+                for a in by_doi.get(d, []):
+                    sc = a.get("cited") or 0
+                    out[a["eid"]] = round(min(sc, sc * y / tot), 2) if tot else 0
+    if failed:
+        log(f"  OpenAlex: {failed} sorğu alınmadı")
+    return out
+
+
 def _refeid_count(api, eid, year):
     r = api.get("/search/scopus", {"query": f"REFEID({eid}) AND PUBYEAR IS {year}", "count": 1, "field": "eid"})
     return _int(((r or {}).get("search-results") or {}).get("opensearch:totalResults")) or 0
@@ -683,7 +724,15 @@ def citations_this_year(api, con, articles, year=None):
         except (AuthError, RuntimeError) as e:
             log(f"  REFEID axtarışı əlçatan deyil ({str(e)[:80]})")
     if method is None:
-        log("  Bu il alınan istinadlar yalnız universitet şəbəkəsində yenilənir; əvvəlki saylar saxlanıldı.")
+        need = [a for a in todo if a.get("cy") is None]
+        est = _openalex_year_share(need, year) if need else {}
+        base = [a for a in need if a["eid"] in est]
+        share = (sum(est[a["eid"]] for a in base) / max(1, sum(a["cited"] for a in base))) if base else 0
+        for a in need:
+            a["cy"] = est[a["eid"]] if a["eid"] in est else round(a["cited"] * share, 2)
+            a["cyx"] = 1
+        log(f"  Scopus-un dəqiq sayı yalnız universitet şəbəkəsində alınır. {len(est)}/{len(need)} məqalə üçün "
+            f"OpenAlex illik payı ilə təxmini hesablandı.")
         return
 
     def one_batch(batch):
@@ -943,7 +992,7 @@ def build(cfg, depts, articles, con, demo=False):
         "this_year": this_year,
         "faculty": fac,
         "departments": out_depts,
-        "articles": {e: dict({k: a.get(k) for k in ("title", "journal", "year", "date", "cited", "cy", "q_sjr", "q_cs",
+        "articles": {e: dict({k: a.get(k) for k in ("title", "journal", "year", "date", "cited", "cy", "cyx", "q_sjr", "q_cs",
                                                      "doi", "type", "volume", "pages")},
                              authors=[x["name"] for x in a.get("authors", [])],
                              **intl_info(a),
